@@ -1,0 +1,8 @@
+{
+  "directory": "./src",
+  "include": [".ts$", ".tsx$"],
+  "singleQuotes": true,
+  "noSemicolon": true,
+  "delete": true,
+  "flat": true
+}

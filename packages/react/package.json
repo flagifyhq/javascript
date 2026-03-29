@@ -1,0 +1,55 @@
+{
+  "name": "@flagify/react",
+  "version": "0.0.1",
+  "description": "React SDK for Flagify — hooks and provider for feature flag evaluation.",
+  "author": "Mario Campbell R <mario@mariocampbellr.com>",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "barrelsby -c ./barrelsby.json",
+    "build": "pnpm run generate && tsup src/index.ts --format esm,cjs --dts",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "@flagify/node": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "react": "^18.2.0"
+  },
+  "keywords": [
+    "feature-flags",
+    "flagify",
+    "react",
+    "hooks"
+  ],
+  "homepage": "https://flagify.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flagifyhq/javascript",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/flagifyhq/javascript/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

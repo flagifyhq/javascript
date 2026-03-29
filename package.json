@@ -1,0 +1,22 @@
+{
+  "name": "@flagify/javascript",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "generate": "turbo run generate",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "barrelsby": "^2.8.1",
+    "tsup": "^8.5.0",
+    "turbo": "^2.6.3",
+    "typescript": "^5.9.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.12"
+  }
+}

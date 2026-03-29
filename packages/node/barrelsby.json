@@ -1,0 +1,9 @@
+{
+  "directory": "./src",
+  "include": [".ts$"],
+  "singleQuotes": true,
+  "noSemicolon": true,
+  "delete": true,
+  "flat": true,
+  "exclude": ["api"]
+}
