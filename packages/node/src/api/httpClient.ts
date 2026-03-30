@@ -1,24 +1,27 @@
-import { FlagifyOptions } from "@flagify/types/FlagifyTypes";
+import { FlagifyOptions } from "../types/FlagifyTypes";
 
 export interface FlagifyHttpClient {
   get<T = unknown>(path: string): Promise<T>;
   post<T = unknown, B = unknown>(path: string, body: B): Promise<T>;
+  baseUrl: string;
+  headers: Record<string, string>;
 }
 
 export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
-  const baseUrl = process.env.FLAGIFY_API_URL ?? "https://api.flagify.dev";
-  console.log(`[HTTP CLIENT] Using base URL: ${baseUrl}`);
+  const baseUrl =
+    config.options?.apiUrl ??
+    process.env.FLAGIFY_API_URL ??
+    "https://api.flagify.dev";
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-public-key": config.publicKey,
+    "x-api-key": config.publicKey,
   };
 
-  if (config.secretKey) {
-    headers["x-secret-key"] = config.secretKey;
-  }
-
   return {
+    baseUrl,
+    headers,
+
     get: async <T = unknown>(path: string): Promise<T> => {
       const res = await fetch(`${baseUrl}${path}`, {
         method: "GET",
