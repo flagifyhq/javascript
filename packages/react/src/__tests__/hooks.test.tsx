@@ -21,6 +21,13 @@ function createMockClient(flags: Record<string, { enabled: boolean; type: string
       if (!f) return fallback;
       return f.enabled ? (f.value as T) : fallback;
     },
+    getVariant(key: string, fallback: string) {
+      const f = flags[key];
+      if (!f || !f.enabled) return fallback;
+      const variants = (f as any).variants;
+      if (!variants || variants.length === 0) return fallback;
+      return variants.sort((a: any, b: any) => b.weight - a.weight)[0].key;
+    },
     ready: () => Promise.resolve(),
     destroy: vi.fn(),
     onFlagChange: null,
@@ -85,18 +92,33 @@ describe("React hooks", () => {
   });
 
   describe("useVariant", () => {
-    it("returns variant string", () => {
-      const client = createMockClient({ "checkout": { enabled: true, type: "string", value: "variant-a" } });
+    it("returns highest-weight variant key", () => {
+      const flags: any = {
+        "checkout": {
+          enabled: true, type: "string", value: "x",
+          variants: [
+            { key: "control", value: "a", weight: 50 },
+            { key: "variant-a", value: "b", weight: 30 },
+          ],
+        },
+      };
+      const client = createMockClient(flags);
       const wrapper = createWrapper({ client, isReady: true, version: 0 });
-      const { result } = renderHook(() => useVariant("checkout", "control"), { wrapper });
-      expect(result.current).toBe("variant-a");
+      const { result } = renderHook(() => useVariant("checkout", "fallback"), { wrapper });
+      expect(result.current).toBe("control");
     });
 
     it("returns fallback when disabled", () => {
-      const client = createMockClient({ "checkout": { enabled: false, type: "string", value: "variant-a" } });
+      const flags: any = {
+        "checkout": {
+          enabled: false, type: "string", value: "x",
+          variants: [{ key: "control", value: "a", weight: 100 }],
+        },
+      };
+      const client = createMockClient(flags);
       const wrapper = createWrapper({ client, isReady: true, version: 0 });
-      const { result } = renderHook(() => useVariant("checkout", "control"), { wrapper });
-      expect(result.current).toBe("control");
+      const { result } = renderHook(() => useVariant("checkout", "fallback"), { wrapper });
+      expect(result.current).toBe("fallback");
     });
   });
 

@@ -59,6 +59,15 @@ export interface FlagifyFlaggy {
   }>
 
   /**
+   * Optional multivariate variants for A/B testing.
+   */
+  variants?: Array<{
+    key: string
+    value: boolean | string | number | Record<string, unknown>
+    weight: number
+  }>
+
+  /**
    * Timestamp of when the flag was created.
    */
   createdAt: string // ISO 8601 format
