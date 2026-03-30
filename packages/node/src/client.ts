@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { createHttpClient, FlagifyHttpClient } from "./api/httpClient";
-import { RealtimeListener } from "./realtime";
+import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
 import { FlagifyFlaggy } from "./types/FlagifyFlaggy";
 import { FlagifyOptions } from "./types/FlagifyTypes";
@@ -15,30 +15,39 @@ export class Flagify implements IFlagifyClient {
   private flagCache: Map<string, CachedFlag> = new Map();
   private httpClient: FlagifyHttpClient;
   private realtime: RealtimeListener | null = null;
+  private readyPromise: Promise<void>;
+
+  /** Called when a flag changes via SSE. Useful for triggering React re-renders. */
+  onFlagChange: ((event: FlagChangeEvent) => void) | null = null;
 
   constructor(private readonly config: FlagifyOptions) {
     this.validateConfig();
     this.httpClient = createHttpClient(config);
-    this.syncFlags();
+    this.readyPromise = this.syncFlags();
 
     if (this.config.options?.realtime) {
       this.setupRealtimeListener();
     }
   }
 
-  getValue<T = unknown>(flagKey: string): T {
+  /** Resolves when the initial flag sync is complete. */
+  ready(): Promise<void> {
+    return this.readyPromise;
+  }
+
+  getValue<T>(flagKey: string, fallback: T): T {
     const cached = this.flagCache.get(flagKey);
 
-    if (!cached) return undefined as T;
+    if (!cached) return fallback;
 
     if (this.isStale(cached)) {
       this.refetchFlag(flagKey);
-      return cached.flag.defaultValue as T;
+      return (cached.flag.defaultValue as T) ?? fallback;
     }
 
     return cached.flag.enabled
       ? (cached.flag.defaultValue as T)
-      : (undefined as T);
+      : fallback;
   }
 
   isEnabled(flagKey: string): boolean {
@@ -48,7 +57,7 @@ export class Flagify implements IFlagifyClient {
 
     if (this.isStale(cached)) {
       this.refetchFlag(flagKey);
-      return Boolean(cached.flag.defaultValue); // fallback
+      return Boolean(cached.flag.defaultValue);
     }
 
     if (cached.flag.type !== "boolean") return false;
@@ -84,12 +93,17 @@ export class Flagify implements IFlagifyClient {
         flag: fresh,
         lastFetchedAt: Date.now(),
       });
+      this.onFlagChange?.({
+        environmentId: "",
+        flagKey,
+        action: "updated",
+      });
     } catch (err) {
       console.warn(`[Flagify] Failed to refetch flag "${flagKey}":`, err);
     }
   }
 
-  private async syncFlags() {
+  private async syncFlags(): Promise<void> {
     try {
       const flags = await this.httpClient.get<FlagifyFlaggy[]>(`/v1/eval/flags`);
 

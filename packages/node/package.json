@@ -21,6 +21,7 @@
     "generate": "barrelsby -c ./barrelsby.json",
     "build": "pnpm run generate && tsup src/index.ts --format esm,cjs --dts",
     "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "test": "vitest run",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

@@ -5,5 +5,5 @@
   "noSemicolon": true,
   "delete": true,
   "flat": true,
-  "exclude": ["api"]
+  "exclude": ["api", "__tests__"]
 }
