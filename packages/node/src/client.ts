@@ -5,6 +5,13 @@ import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
 import { FlagifyFlaggy } from "./types/FlagifyFlaggy";
 import { FlagifyOptions } from "./types/FlagifyTypes";
+import { FlagifyUser } from "./types/FlagifyUser";
+
+export interface EvaluateResult {
+  key: string;
+  value: unknown;
+  reason: "targeting_rule" | "rollout" | "default" | "disabled";
+}
 
 type CachedFlag = {
   flag: FlagifyFlaggy;
@@ -80,6 +87,13 @@ export class Flagify implements IFlagifyClient {
       }
     }
     return best.key;
+  }
+
+  async evaluate(flagKey: string, user: FlagifyUser): Promise<EvaluateResult> {
+    return this.httpClient.post<EvaluateResult>(
+      `/v1/eval/flags/${flagKey}/evaluate`,
+      { userId: user.id, attributes: user },
+    );
   }
 
   /**

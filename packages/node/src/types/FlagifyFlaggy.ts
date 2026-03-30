@@ -47,15 +47,16 @@ export interface FlagifyFlaggy {
    * Optional targeting rules for user segmentation.
    */
   targetingRules?: Array<{
-    attribute: string
-    operator:
-      | 'equals'
-      | 'not_equals'
-      | 'contains'
-      | 'not_contains'
-      | 'starts_with'
-      | 'ends_with'
-    value: string | number | boolean
+    priority: number
+    segmentId?: string
+    valueOverride?: unknown
+    rolloutPercentage?: number
+    enabled: boolean
+    conditions?: Array<{
+      attribute: string
+      operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'in' | 'not_in' | 'gt' | 'lt'
+      value: unknown
+    }>
   }>
 
   /**
