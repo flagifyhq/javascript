@@ -29,4 +29,10 @@ export interface IFlagifyClient {
    * @returns The winning variant key.
    */
   getVariant(flagKey: string, fallback: string): string;
+
+  /**
+   * Evaluates a flag with user context for targeting rules.
+   * Calls the API's evaluate endpoint directly (not cached).
+   */
+  evaluate(flagKey: string, user: import('./FlagifyUser').FlagifyUser): Promise<import('../client').EvaluateResult>;
 }
