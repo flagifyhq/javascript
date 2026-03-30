@@ -1,6 +1,7 @@
 {
   "directory": "./src",
   "include": [".ts$", ".tsx$"],
+  "exclude": ["__tests__"],
   "singleQuotes": true,
   "noSemicolon": true,
   "delete": true,

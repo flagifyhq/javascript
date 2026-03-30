@@ -9,7 +9,7 @@ export interface IFlagifyClient {
    * @param flagKey - The key of the feature flag to retrieve.
    * @returns The resolved value of the feature flag.
    */
-  getValue<T = unknown>(flagKey: string): T;
+  getValue<T>(flagKey: string, fallback: T): T;
 
   /**
    * Checks if a boolean feature flag is enabled.

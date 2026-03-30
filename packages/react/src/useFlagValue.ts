@@ -1,6 +1,10 @@
+import { useContext } from 'react'
+import { FlagifyContext } from './context'
 import { useFlagifyClient } from './useFlagifyClient'
 
-export function useFlagValue<T = unknown>(flagKey: string): T | undefined {
+export function useFlagValue<T>(flagKey: string, fallback: T): T {
+  const { version } = useContext(FlagifyContext)
   const client = useFlagifyClient()
-  return client.getValue<T>(flagKey)
+  void version
+  return client.getValue<T>(flagKey, fallback)
 }
