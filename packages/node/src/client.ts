@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { createHttpClient, FlagifyHttpClient } from "./api/httpClient";
+import { RealtimeListener } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
 import { FlagifyFlaggy } from "./types/FlagifyFlaggy";
 import { FlagifyOptions } from "./types/FlagifyTypes";
@@ -13,6 +14,7 @@ type CachedFlag = {
 export class Flagify implements IFlagifyClient {
   private flagCache: Map<string, CachedFlag> = new Map();
   private httpClient: FlagifyHttpClient;
+  private realtime: RealtimeListener | null = null;
 
   constructor(private readonly config: FlagifyOptions) {
     this.validateConfig();
@@ -53,11 +55,20 @@ export class Flagify implements IFlagifyClient {
     return cached.flag.enabled ? Boolean(cached.flag.defaultValue) : false;
   }
 
+  /**
+   * Disconnects the realtime listener and cleans up resources.
+   */
+  destroy(): void {
+    if (this.realtime) {
+      this.realtime.disconnect();
+      this.realtime = null;
+    }
+  }
+
   private isStale(cached: CachedFlag): boolean {
     const staleTime = this.config.options?.staleTimeMs;
 
     if (typeof staleTime !== "number") {
-      // ❌ No se considera stale si no se definió `staleTimeMs`
       return false;
     }
 
@@ -67,20 +78,20 @@ export class Flagify implements IFlagifyClient {
   private async refetchFlag(flagKey: string) {
     try {
       const fresh = await this.httpClient.get<FlagifyFlaggy>(
-        `/v1/flags/${flagKey}`,
+        `/v1/eval/flags/${flagKey}`,
       );
       this.flagCache.set(flagKey, {
         flag: fresh,
         lastFetchedAt: Date.now(),
       });
     } catch (err) {
-      console.warn(`[FlagifyClient] Failed to refetch flag "${flagKey}":`, err);
+      console.warn(`[Flagify] Failed to refetch flag "${flagKey}":`, err);
     }
   }
 
   private async syncFlags() {
     try {
-      const flags = await this.httpClient.get<FlagifyFlaggy[]>(`/v1/flags`);
+      const flags = await this.httpClient.get<FlagifyFlaggy[]>(`/v1/eval/flags`);
 
       for (const flag of flags) {
         this.flagCache.set(flag.key, {
@@ -89,7 +100,7 @@ export class Flagify implements IFlagifyClient {
         });
       }
     } catch (err) {
-      console.warn(`[FlagifyClient] Failed to sync flags: ${err}`);
+      console.warn(`[Flagify] Failed to sync flags: ${err}`);
     }
   }
 
@@ -106,14 +117,26 @@ export class Flagify implements IFlagifyClient {
 
     if (missing.length > 0) {
       console.error(
-        `[FlagifyClient] Missing required config keys: ${missing.join(", ")}`,
+        `[Flagify] Missing required config keys: ${missing.join(", ")}`,
         "All feature flags will be disabled.",
       );
     }
   }
 
   private setupRealtimeListener() {
-    // Placeholder: para futuros sockets/SSE
-    console.info("[FlagifyClient] Realtime support is not yet implemented.");
+    this.realtime = new RealtimeListener(this.httpClient, {
+      onConnected: () => {
+        console.info("[Flagify] Realtime connected");
+      },
+      onFlagChange: (event) => {
+        console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
+        this.refetchFlag(event.flagKey);
+      },
+      onError: (error) => {
+        console.warn("[Flagify] Realtime error (will reconnect):", error.message);
+      },
+    });
+
+    this.realtime.connect();
   }
 }
