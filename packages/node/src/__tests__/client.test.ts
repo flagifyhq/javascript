@@ -147,6 +147,57 @@ describe("Flagify client", () => {
     });
   });
 
+  describe("getVariant()", () => {
+    it("returns variant key with highest weight", async () => {
+      mockFetchResponse([
+        makeFlag({
+          key: "checkout",
+          type: "string",
+          enabled: true,
+          variants: [
+            { key: "control", value: "Welcome", weight: 50 },
+            { key: "variant-a", value: "Hi", weight: 30 },
+            { key: "variant-b", value: "Hey", weight: 20 },
+          ],
+        }),
+      ]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.getVariant("checkout", "fallback")).toBe("control");
+    });
+
+    it("returns fallback when flag has no variants", async () => {
+      mockFetchResponse([makeFlag({ key: "feat", enabled: true })]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.getVariant("feat", "default")).toBe("default");
+    });
+
+    it("returns fallback when flag is disabled", async () => {
+      mockFetchResponse([
+        makeFlag({
+          key: "checkout",
+          enabled: false,
+          variants: [{ key: "control", value: "x", weight: 100 }],
+        }),
+      ]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.getVariant("checkout", "fallback")).toBe("fallback");
+    });
+
+    it("returns fallback when flag missing", async () => {
+      mockFetchResponse([]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.getVariant("nope", "default")).toBe("default");
+    });
+  });
+
   describe("destroy()", () => {
     it("does not throw when no realtime", async () => {
       mockFetchResponse([]);
@@ -173,7 +224,7 @@ describe("Flagify client", () => {
 
       // Trigger refetch via stale read
       mockFetchResponse(makeFlag({ key: "feat", enabled: false }));
-      client.getValue("feat");
+      client.getValue("feat", false);
 
       // Wait for async refetch
       await new Promise((r) => setTimeout(r, 50));

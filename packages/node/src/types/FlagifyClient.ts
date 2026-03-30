@@ -19,4 +19,14 @@ export interface IFlagifyClient {
    * @returns True if the flag is enabled, false otherwise.
    */
   isEnabled(flagKey: string): boolean;
+
+  /**
+   * Returns the variant key with the highest weight for a multivariate flag.
+   * Returns fallback if the flag is missing, disabled, or has no variants.
+   *
+   * @param flagKey - The key of the feature flag.
+   * @param fallback - The default variant key.
+   * @returns The winning variant key.
+   */
+  getVariant(flagKey: string, fallback: string): string;
 }

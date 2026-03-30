@@ -64,6 +64,24 @@ export class Flagify implements IFlagifyClient {
     return cached.flag.enabled ? Boolean(cached.flag.defaultValue) : false;
   }
 
+  getVariant(flagKey: string, fallback: string): string {
+    const cached = this.flagCache.get(flagKey);
+
+    if (!cached || !cached.flag.enabled) return fallback;
+
+    const variants = cached.flag.variants;
+    if (!variants || variants.length === 0) return fallback;
+
+    // Return the variant key with the highest weight
+    let best = variants[0];
+    for (let i = 1; i < variants.length; i++) {
+      if (variants[i].weight > best.weight) {
+        best = variants[i];
+      }
+    }
+    return best.key;
+  }
+
   /**
    * Disconnects the realtime listener and cleans up resources.
    */
