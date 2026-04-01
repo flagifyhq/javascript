@@ -54,9 +54,7 @@ export class Flagify implements IFlagifyClient {
       this.refetchFlag(flagKey);
     }
 
-    if (!cached.flag.enabled) {
-      return (cached.flag.defaultValue as T) ?? fallback;
-    }
+    if (!cached.flag.enabled) return cached.flag.offValue as T;
     return (cached.flag.value as T) ?? fallback;
   }
 
@@ -70,7 +68,7 @@ export class Flagify implements IFlagifyClient {
     }
 
     if (cached.flag.type !== "boolean") return false;
-    if (!cached.flag.enabled) return cached.flag.defaultValue === true;
+    if (!cached.flag.enabled) return cached.flag.offValue === true;
     return cached.flag.value === true;
   }
 

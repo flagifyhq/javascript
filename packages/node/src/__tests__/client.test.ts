@@ -14,6 +14,7 @@ function makeFlag(overrides: Partial<FlagifyFlaggy> = {}): FlagifyFlaggy {
     value: true,
     type: "boolean",
     defaultValue: true,
+    offValue: false,
     enabled: true,
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
@@ -72,16 +73,16 @@ describe("Flagify client", () => {
       expect(client.isEnabled("dark-mode")).toBe(false);
     });
 
-    it("returns defaultValue for disabled boolean flag", async () => {
-      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: true, defaultValue: false })]);
+    it("returns offValue for disabled boolean flag", async () => {
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: true, offValue: false })]);
       const client = createClient();
       await client.ready();
 
       expect(client.isEnabled("dark-mode")).toBe(false);
     });
 
-    it("returns true defaultValue for disabled boolean flag with default true", async () => {
-      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: false, defaultValue: true })]);
+    it("returns true offValue for disabled boolean flag with offValue true", async () => {
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: false, offValue: true })]);
       const client = createClient();
       await client.ready();
 
@@ -124,20 +125,21 @@ describe("Flagify client", () => {
       expect(client.getValue<number>("max-retries", 0)).toBe(5);
     });
 
-    it("returns defaultValue for disabled flag", async () => {
+    it("returns offValue for disabled flag", async () => {
       mockFetchResponse([
         makeFlag({
           key: "max-retries",
           type: "number",
           value: 5,
           defaultValue: 3,
+          offValue: 0,
           enabled: false,
         }),
       ]);
       const client = createClient();
       await client.ready();
 
-      expect(client.getValue<number>("max-retries", 10)).toBe(3);
+      expect(client.getValue<number>("max-retries", 10)).toBe(0);
     });
 
     it("returns fallback for non-existent flag", async () => {
