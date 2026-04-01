@@ -52,12 +52,12 @@ export class Flagify implements IFlagifyClient {
 
     if (this.isStale(cached)) {
       this.refetchFlag(flagKey);
-      return (cached.flag.value as T) ?? fallback;
     }
 
-    return cached.flag.enabled
-      ? (cached.flag.value as T)
-      : fallback;
+    if (!cached.flag.enabled) {
+      return (cached.flag.defaultValue as T) ?? fallback;
+    }
+    return (cached.flag.value as T) ?? fallback;
   }
 
   isEnabled(flagKey: string): boolean {
@@ -67,11 +67,11 @@ export class Flagify implements IFlagifyClient {
 
     if (this.isStale(cached)) {
       this.refetchFlag(flagKey);
-      return cached.flag.enabled && Boolean(cached.flag.value);
     }
 
     if (cached.flag.type !== "boolean") return false;
-    return cached.flag.enabled && Boolean(cached.flag.value);
+    if (!cached.flag.enabled) return cached.flag.defaultValue === true;
+    return cached.flag.value === true;
   }
 
   getVariant(flagKey: string, fallback: string): string {

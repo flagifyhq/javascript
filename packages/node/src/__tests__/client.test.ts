@@ -64,7 +64,7 @@ describe("Flagify client", () => {
       expect(client.isEnabled("dark-mode")).toBe(true);
     });
 
-    it("returns false for enabled boolean flag with value false", async () => {
+    it("returns value for enabled boolean flag", async () => {
       mockFetchResponse([makeFlag({ key: "dark-mode", enabled: true, value: false })]);
       const client = createClient();
       await client.ready();
@@ -72,12 +72,20 @@ describe("Flagify client", () => {
       expect(client.isEnabled("dark-mode")).toBe(false);
     });
 
-    it("returns false for disabled boolean flag", async () => {
-      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: true })]);
+    it("returns defaultValue for disabled boolean flag", async () => {
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: true, defaultValue: false })]);
       const client = createClient();
       await client.ready();
 
       expect(client.isEnabled("dark-mode")).toBe(false);
+    });
+
+    it("returns true defaultValue for disabled boolean flag with default true", async () => {
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: false, defaultValue: true })]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.isEnabled("dark-mode")).toBe(true);
     });
 
     it("returns false for non-existent flag", async () => {
@@ -116,20 +124,20 @@ describe("Flagify client", () => {
       expect(client.getValue<number>("max-retries", 0)).toBe(5);
     });
 
-    it("returns fallback for disabled flag", async () => {
+    it("returns defaultValue for disabled flag", async () => {
       mockFetchResponse([
         makeFlag({
           key: "max-retries",
           type: "number",
           value: 5,
-          defaultValue: 5,
+          defaultValue: 3,
           enabled: false,
         }),
       ]);
       const client = createClient();
       await client.ready();
 
-      expect(client.getValue<number>("max-retries", 10)).toBe(10);
+      expect(client.getValue<number>("max-retries", 10)).toBe(3);
     });
 
     it("returns fallback for non-existent flag", async () => {
@@ -257,6 +265,7 @@ describe("Flagify client", () => {
       await client.ready();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Boolean flag: enabled=true, value=false → isEnabled()=false
       expect(client.isEnabled("analytics")).toBe(false);
     });
 
@@ -289,7 +298,7 @@ describe("Flagify client", () => {
       });
       await client.ready();
 
-      // Should still work with the original GET values
+      // Boolean flag: enabled=true, value=false → isEnabled()=false
       expect(client.isEnabled("feat")).toBe(false);
     });
   });
