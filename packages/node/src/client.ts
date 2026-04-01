@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 import { createHttpClient, FlagifyHttpClient } from "./api/httpClient";
 import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
