@@ -3,6 +3,7 @@ import { FlagifyHttpClient } from "./api/httpClient";
 export interface RealtimeEvents {
   onFlagChange: (event: FlagChangeEvent) => void;
   onConnected: () => void;
+  onReconnected: () => void;
   onError: (error: Error) => void;
 }
 
@@ -19,6 +20,7 @@ export class RealtimeListener {
   private controller: AbortController | null = null;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasConnectedBefore = false;
 
   constructor(
     private readonly httpClient: FlagifyHttpClient,
@@ -108,7 +110,12 @@ export class RealtimeListener {
     }
 
     if (eventType === "connected") {
-      this.events.onConnected();
+      if (this.hasConnectedBefore) {
+        this.events.onReconnected();
+      } else {
+        this.hasConnectedBefore = true;
+        this.events.onConnected();
+      }
       return;
     }
 

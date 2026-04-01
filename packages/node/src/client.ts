@@ -214,6 +214,10 @@ export class Flagify implements IFlagifyClient {
       onConnected: () => {
         console.info("[Flagify] Realtime connected");
       },
+      onReconnected: () => {
+        console.info("[Flagify] Realtime reconnected — resyncing all flags");
+        this.syncFlags();
+      },
       onFlagChange: (event) => {
         console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
         this.refetchFlag(event.flagKey);
