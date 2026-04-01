@@ -29,9 +29,14 @@ export interface FlagifyFlaggy {
   type: 'boolean' | 'string' | 'number' | 'json'
 
   /**
-   * Default value to use when no targeting rules match or in case of evaluation failure.
+   * Default value returned when the flag is enabled but no targeting rules match.
    */
   defaultValue: boolean | string | number | Record<string, unknown>
+
+  /**
+   * Value returned when the flag is disabled (enabled = false).
+   */
+  offValue: boolean | string | number | Record<string, unknown>
 
   /**
    * Indicates whether the flag is currently active.
