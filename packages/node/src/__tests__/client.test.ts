@@ -56,16 +56,24 @@ describe("Flagify client", () => {
   });
 
   describe("isEnabled()", () => {
-    it("returns true for enabled boolean flag", async () => {
-      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: true })]);
+    it("returns true for enabled boolean flag with value true", async () => {
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: true, value: true })]);
       const client = createClient();
       await client.ready();
 
       expect(client.isEnabled("dark-mode")).toBe(true);
     });
 
+    it("returns false for enabled boolean flag with value false", async () => {
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: true, value: false })]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.isEnabled("dark-mode")).toBe(false);
+    });
+
     it("returns false for disabled boolean flag", async () => {
-      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false })]);
+      mockFetchResponse([makeFlag({ key: "dark-mode", enabled: false, value: true })]);
       const client = createClient();
       await client.ready();
 
@@ -92,12 +100,13 @@ describe("Flagify client", () => {
   });
 
   describe("getValue()", () => {
-    it("returns defaultValue for enabled flag", async () => {
+    it("returns value for enabled flag", async () => {
       mockFetchResponse([
         makeFlag({
           key: "max-retries",
           type: "number",
-          defaultValue: 5,
+          value: 5,
+          defaultValue: 3,
           enabled: true,
         }),
       ]);
@@ -112,6 +121,7 @@ describe("Flagify client", () => {
         makeFlag({
           key: "max-retries",
           type: "number",
+          value: 5,
           defaultValue: 5,
           enabled: false,
         }),
@@ -195,6 +205,153 @@ describe("Flagify client", () => {
       await client.ready();
 
       expect(client.getVariant("nope", "default")).toBe("default");
+    });
+  });
+
+  describe("evaluateWithUser()", () => {
+    it("calls POST /v1/eval/flags/evaluate when user is provided", async () => {
+      // First call: GET /v1/eval/flags
+      mockFetchResponse([
+        makeFlag({ key: "analytics", enabled: true, value: false }),
+      ]);
+      // Second call: POST /v1/eval/flags/evaluate
+      mockFetchResponse([
+        { key: "analytics", value: true, reason: "targeting_rule" },
+      ]);
+
+      const client = createClient({
+        options: { user: { id: "pro1", plan: "pro" } },
+      });
+      await client.ready();
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("/v1/eval/flags/evaluate"),
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    it("updates cached value from evaluation result", async () => {
+      mockFetchResponse([
+        makeFlag({ key: "analytics", type: "boolean", enabled: true, value: false }),
+      ]);
+      mockFetchResponse([
+        { key: "analytics", value: true, reason: "targeting_rule" },
+      ]);
+
+      const client = createClient({
+        options: { user: { id: "pro1", plan: "pro" } },
+      });
+      await client.ready();
+
+      expect(client.isEnabled("analytics")).toBe(true);
+    });
+
+    it("keeps original value when no user is provided", async () => {
+      mockFetchResponse([
+        makeFlag({ key: "analytics", type: "boolean", enabled: true, value: false }),
+      ]);
+
+      const client = createClient();
+      await client.ready();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(client.isEnabled("analytics")).toBe(false);
+    });
+
+    it("sends userId and attributes in POST body", async () => {
+      mockFetchResponse([makeFlag()]);
+      mockFetchResponse([]);
+
+      const user = { id: "u42", plan: "enterprise", role: "admin" };
+      createClient({ options: { user } });
+
+      await vi.waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      const postCall = mockFetch.mock.calls[1];
+      const body = JSON.parse(postCall[1].body);
+      expect(body.userId).toBe("u42");
+      expect(body.attributes).toEqual(user);
+    });
+
+    it("falls back gracefully if evaluate endpoint fails", async () => {
+      mockFetchResponse([
+        makeFlag({ key: "feat", type: "boolean", enabled: true, value: false }),
+      ]);
+      // Evaluate fails
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500, statusText: "Internal Server Error" });
+
+      const client = createClient({
+        options: { user: { id: "u1" } },
+      });
+      await client.ready();
+
+      // Should still work with the original GET values
+      expect(client.isEnabled("feat")).toBe(false);
+    });
+  });
+
+  describe("polling", () => {
+    it("calls syncFlags periodically when pollIntervalMs is set", async () => {
+      vi.useFakeTimers();
+
+      // Initial sync
+      mockFetchResponse([makeFlag({ key: "feat", enabled: true, value: true })]);
+
+      const client = createClient({ options: { pollIntervalMs: 1000 } });
+      await client.ready();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // First poll
+      mockFetchResponse([makeFlag({ key: "feat", enabled: true, value: false })]);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      client.destroy();
+      vi.useRealTimers();
+    });
+
+    it("triggers onFlagChange on each poll", async () => {
+      vi.useFakeTimers();
+
+      mockFetchResponse([makeFlag()]);
+      const client = createClient({ options: { pollIntervalMs: 500 } });
+      await client.ready();
+
+      const onChange = vi.fn();
+      client.onFlagChange = onChange;
+
+      mockFetchResponse([makeFlag()]);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ flagKey: "*", action: "updated" }),
+      );
+
+      client.destroy();
+      vi.useRealTimers();
+    });
+
+    it("stops polling after destroy()", async () => {
+      vi.useFakeTimers();
+
+      mockFetchResponse([makeFlag()]);
+      const client = createClient({ options: { pollIntervalMs: 500 } });
+      await client.ready();
+
+      client.destroy();
+
+      await vi.advanceTimersByTimeAsync(1500);
+
+      // Only the initial sync call, no poll calls
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
     });
   });
 
