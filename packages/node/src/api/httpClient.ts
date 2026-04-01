@@ -10,7 +10,7 @@ export interface FlagifyHttpClient {
 export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
   const baseUrl =
     config.options?.apiUrl ??
-    process.env.FLAGIFY_API_URL ??
+    (typeof process !== "undefined" ? process.env.FLAGIFY_API_URL : undefined) ??
     "https://api.flagify.dev";
 
   const headers: Record<string, string> = {
