@@ -21,6 +21,7 @@ export class Flagify implements IFlagifyClient {
   private httpClient: FlagifyHttpClient;
   private realtime: RealtimeListener | null = null;
   private readyPromise: Promise<void>;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Called when a flag changes via SSE. Useful for triggering React re-renders. */
   onFlagChange: ((event: FlagChangeEvent) => void) | null = null;
@@ -32,6 +33,10 @@ export class Flagify implements IFlagifyClient {
 
     if (this.config.options?.realtime) {
       this.setupRealtimeListener();
+    }
+
+    if (this.config.options?.pollIntervalMs) {
+      this.setupPolling();
     }
   }
 
@@ -47,11 +52,11 @@ export class Flagify implements IFlagifyClient {
 
     if (this.isStale(cached)) {
       this.refetchFlag(flagKey);
-      return (cached.flag.defaultValue as T) ?? fallback;
+      return (cached.flag.value as T) ?? fallback;
     }
 
     return cached.flag.enabled
-      ? (cached.flag.defaultValue as T)
+      ? (cached.flag.value as T)
       : fallback;
   }
 
@@ -62,11 +67,11 @@ export class Flagify implements IFlagifyClient {
 
     if (this.isStale(cached)) {
       this.refetchFlag(flagKey);
-      return Boolean(cached.flag.defaultValue);
+      return cached.flag.enabled && Boolean(cached.flag.value);
     }
 
     if (cached.flag.type !== "boolean") return false;
-    return cached.flag.enabled ? Boolean(cached.flag.defaultValue) : false;
+    return cached.flag.enabled && Boolean(cached.flag.value);
   }
 
   getVariant(flagKey: string, fallback: string): string {
@@ -101,6 +106,11 @@ export class Flagify implements IFlagifyClient {
     if (this.realtime) {
       this.realtime.disconnect();
       this.realtime = null;
+    }
+
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
   }
 
@@ -143,8 +153,34 @@ export class Flagify implements IFlagifyClient {
           lastFetchedAt: Date.now(),
         });
       }
+
+      const user = this.config.options?.user;
+      if (user) {
+        await this.evaluateWithUser(user);
+      }
     } catch (err) {
       console.warn(`[Flagify] Failed to sync flags: ${err}`);
+    }
+  }
+
+  private async evaluateWithUser(user: FlagifyUser): Promise<void> {
+    try {
+      const results = await this.httpClient.post<
+        Array<{ key: string; value: FlagifyFlaggy["value"]; reason: string }>,
+        { userId: string; attributes: FlagifyUser }
+      >(`/v1/eval/flags/evaluate`, { userId: user.id, attributes: user });
+
+      for (const result of results) {
+        const cached = this.flagCache.get(result.key);
+        if (cached) {
+          this.flagCache.set(result.key, {
+            flag: { ...cached.flag, value: result.value },
+            lastFetchedAt: cached.lastFetchedAt,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`[Flagify] Failed to evaluate flags for user: ${err}`);
     }
   }
 
@@ -165,6 +201,14 @@ export class Flagify implements IFlagifyClient {
         "All feature flags will be disabled.",
       );
     }
+  }
+
+  private setupPolling(): void {
+    const interval = this.config.options!.pollIntervalMs!;
+    this.pollTimer = setInterval(async () => {
+      await this.syncFlags();
+      this.onFlagChange?.({ environmentId: "", flagKey: "*", action: "updated" });
+    }, interval);
   }
 
   private setupRealtimeListener() {

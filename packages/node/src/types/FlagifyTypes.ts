@@ -44,8 +44,15 @@ export interface FlagifyOptions {
     staleTimeMs?: number;
 
     /**
-     * Enables real-time flag updates via socket (not yet implemented).
+     * Enables real-time flag updates via Server-Sent Events.
      */
     realtime?: boolean;
+
+    /**
+     * Interval in milliseconds to periodically re-sync all flags.
+     * Useful as a fallback when realtime is unavailable.
+     * Example: 30000 (every 30 seconds).
+     */
+    pollIntervalMs?: number;
   };
 }
