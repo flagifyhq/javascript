@@ -6,5 +6,5 @@ export function useVariant(flagKey: string, fallback: string): string {
   const { version } = useContext(FlagifyContext)
   const client = useFlagifyClient()
   void version
-  return client.getVariant(flagKey, fallback)
+  return client?.getVariant(flagKey, fallback) ?? fallback
 }
