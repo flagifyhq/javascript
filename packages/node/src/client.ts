@@ -131,6 +131,27 @@ export class Flagify implements IFlagifyClient {
         flag: fresh,
         lastFetchedAt: Date.now(),
       });
+
+      // Re-evaluate with user context if configured (targeting rules need it)
+      const user = this.config.options?.user;
+      if (user) {
+        const result = await this.httpClient.post<{
+          key: string;
+          value: FlagifyFlaggy["value"];
+          reason: string;
+        }>(`/v1/eval/flags/${flagKey}/evaluate`, {
+          userId: user.id,
+          attributes: user,
+        });
+        const cached = this.flagCache.get(flagKey);
+        if (cached) {
+          this.flagCache.set(flagKey, {
+            flag: { ...cached.flag, value: result.value },
+            lastFetchedAt: cached.lastFetchedAt,
+          });
+        }
+      }
+
       this.onFlagChange?.({
         environmentId: "",
         flagKey,
@@ -213,6 +234,10 @@ export class Flagify implements IFlagifyClient {
     this.realtime = new RealtimeListener(this.httpClient, {
       onConnected: () => {
         console.info("[Flagify] Realtime connected");
+      },
+      onReconnected: () => {
+        console.info("[Flagify] Realtime reconnected — resyncing all flags");
+        this.syncFlags();
       },
       onFlagChange: (event) => {
         console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
