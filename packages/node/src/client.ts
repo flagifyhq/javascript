@@ -131,6 +131,27 @@ export class Flagify implements IFlagifyClient {
         flag: fresh,
         lastFetchedAt: Date.now(),
       });
+
+      // Re-evaluate with user context if configured (targeting rules need it)
+      const user = this.config.options?.user;
+      if (user) {
+        const result = await this.httpClient.post<{
+          key: string;
+          value: FlagifyFlaggy["value"];
+          reason: string;
+        }>(`/v1/eval/flags/${flagKey}/evaluate`, {
+          userId: user.id,
+          attributes: user,
+        });
+        const cached = this.flagCache.get(flagKey);
+        if (cached) {
+          this.flagCache.set(flagKey, {
+            flag: { ...cached.flag, value: result.value },
+            lastFetchedAt: cached.lastFetchedAt,
+          });
+        }
+      }
+
       this.onFlagChange?.({
         environmentId: "",
         flagKey,
