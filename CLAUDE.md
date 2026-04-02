@@ -4,7 +4,7 @@ Instructions for AI assistants and contributors working on the Flagify JavaScrip
 
 ## Project overview
 
-Monorepo with two npm packages for integrating Flagify feature flags into JavaScript/TypeScript apps.
+Monorepo with npm packages for integrating Flagify feature flags into JavaScript/TypeScript apps.
 
 ## Packages
 
@@ -13,6 +13,7 @@ Monorepo with two npm packages for integrating Flagify feature flags into JavaSc
 | `@flagify/node` | `packages/node/` | Core SDK — flag evaluation, HTTP client, caching, streaming/polling |
 | `@flagify/react` | `packages/react/` | React bindings — FlagifyProvider, useFlag, useVariant, useFlagValue hooks |
 | `@flagify/nestjs` | `packages/nestjs/` | NestJS integration — module, service, guards, decorators for feature flags |
+| `@flagify/astro` | `packages/astro/` | Astro integration — defineFlag, middleware, dev toolbar, Vercel Flags adapter |
 
 ## Key file locations
 
@@ -21,6 +22,7 @@ Monorepo with two npm packages for integrating Flagify feature flags into JavaSc
 | Node SDK source | `packages/node/src/` |
 | React SDK source | `packages/react/src/` |
 | NestJS SDK source | `packages/nestjs/src/` |
+| Astro SDK source | `packages/astro/src/` |
 | Build config | `packages/*/tsup.config.ts` |
 | Turbo config | `turbo.json` |
 | Workspace config | `pnpm-workspace.yaml` |

@@ -1,0 +1,70 @@
+{
+  "name": "@flagify/astro",
+  "version": "0.0.1",
+  "description": "Astro integration for Flagify — feature flags with dev toolbar and middleware.",
+  "author": "Mario Campbell R <mario@mariocampbellr.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js",
+      "require": "./dist/middleware.cjs"
+    },
+    "./adapter": {
+      "types": "./dist/adapter.d.ts",
+      "import": "./dist/adapter.js",
+      "require": "./dist/adapter.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/middleware.ts src/adapter.ts src/toolbar/app.ts --format esm,cjs --dts",
+    "dev": "tsup src/index.ts src/middleware.ts src/adapter.ts src/toolbar/app.ts --format esm,cjs --dts --watch",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@flagify/node": "workspace:*"
+  },
+  "peerDependencies": {
+    "astro": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "flags": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "astro": "^4.0.0"
+  },
+  "keywords": [
+    "astro-integration",
+    "feature-flags",
+    "flagify",
+    "feature-toggle"
+  ],
+  "homepage": "https://flagify.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flagifyhq/javascript",
+    "directory": "packages/astro"
+  },
+  "bugs": {
+    "url": "https://github.com/flagifyhq/javascript/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
