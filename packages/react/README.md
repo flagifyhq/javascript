@@ -37,6 +37,7 @@
 - **Zero config** -- Wrap with `<FlagifyProvider>`, use hooks anywhere
 - **Lightweight** -- Thin wrapper over [`@flagify/node`](https://github.com/flagifyhq/node-sdk)
 - **React 18+** -- Built for modern React
+- **React Native ready** -- Works in React Native and Expo with zero additional setup
 
 ## Table of contents
 
@@ -67,6 +68,16 @@ yarn add @flagify/react
 ```
 
 > **Peer dependency:** React 18+ is required.
+
+## React Native / Expo
+
+`@flagify/react` is fully compatible with React Native (0.64+) and Expo (SDK 44+). No separate package or polyfills needed.
+
+```bash
+npx expo install @flagify/react
+```
+
+Wrap your root with `<FlagifyProvider>` and use hooks anywhere. For a full getting-started guide, see the [React Native documentation](https://flagify.dev/docs/sdks/react-native).
 
 ## Quick start
 
