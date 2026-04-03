@@ -1,0 +1,9 @@
+{
+  "directory": "./src",
+  "include": [".ts$"],
+  "exclude": ["__tests__", "testing"],
+  "singleQuotes": true,
+  "noSemicolon": true,
+  "delete": true,
+  "flat": true
+}

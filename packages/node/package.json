@@ -1,0 +1,52 @@
+{
+  "name": "@flagify/node",
+  "version": "0.0.6",
+  "description": "Official Flagify SDK for feature flag evaluation. TypeScript-first with local caching.",
+  "author": "Mario Campbell R <mario@mariocampbellr.com>",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "barrelsby -c ./barrelsby.json",
+    "build": "pnpm run generate && tsup src/index.ts --format esm,cjs --dts",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0"
+  },
+  "keywords": [
+    "feature-flags",
+    "flagify",
+    "feature-toggle",
+    "sdk"
+  ],
+  "homepage": "https://flagify.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flagifyhq/javascript",
+    "directory": "packages/node"
+  },
+  "bugs": {
+    "url": "https://github.com/flagifyhq/javascript/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
