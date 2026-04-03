@@ -1,10 +1,6 @@
 <p align="center">
   <a href="https://flagify.dev">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://flagify.dev/logo-white.svg" />
-      <source media="(prefers-color-scheme: light)" srcset="https://flagify.dev/logo-color.svg" />
-      <img alt="Flagify" src="https://flagify.dev/logo-color.svg" width="280" />
-    </picture>
+    <img alt="Flagify" src="https://flagify.dev/logo-color.svg" width="280" />
   </a>
 </p>
 
@@ -15,14 +11,14 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@flagify/node"><img src="https://img.shields.io/npm/v/@flagify/node.svg?style=flat-square&color=0D80F9" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/@flagify/node"><img src="https://img.shields.io/npm/dm/@flagify/node.svg?style=flat-square&color=0D80F9" alt="npm downloads" /></a>
-  <a href="https://github.com/flagifyhq/node-sdk/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@flagify/node.svg?style=flat-square&color=0D80F9" alt="license" /></a>
-  <a href="https://github.com/flagifyhq/node-sdk"><img src="https://img.shields.io/github/stars/flagifyhq/node-sdk?style=flat-square&color=0D80F9" alt="github stars" /></a>
+  <a href="https://github.com/flagifyhq/javascript/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@flagify/node.svg?style=flat-square&color=0D80F9" alt="license" /></a>
+  <a href="https://github.com/flagifyhq/javascript"><img src="https://img.shields.io/github/stars/flagifyhq/javascript?style=flat-square&color=0D80F9" alt="github stars" /></a>
 </p>
 
 <p align="center">
   <a href="https://flagify.dev/docs">Documentation</a> &middot;
   <a href="https://flagify.dev/docs/sdks/node">SDK Reference</a> &middot;
-  <a href="https://github.com/flagifyhq/node-sdk/issues">Issues</a> &middot;
+  <a href="https://github.com/flagifyhq/javascript/issues">Issues</a> &middot;
   <a href="https://flagify.dev">Website</a>
 </p>
 
@@ -133,6 +129,7 @@ const flagify = new Flagify({
 | `options.apiUrl` | `string` | No | `https://api.flagify.dev` | Custom API base URL |
 | `options.staleTimeMs` | `number` | No | `300000` | Cache staleness threshold in ms |
 | `options.realtime` | `boolean` | No | `false` | Enable real-time SSE updates |
+| `options.pollIntervalMs` | `number` | No | -- | Polling interval in ms for periodic flag sync |
 | `options.user` | `FlagifyUser` | No | -- | User context for targeting |
 
 ## API reference
@@ -167,19 +164,80 @@ if (flagify.isEnabled('dark-mode')) {
 
 ---
 
-### `flagify.getValue<T>(flagKey: string): T`
+### `flagify.getValue<T>(flagKey: string, fallback: T): T`
 
-Returns the resolved value of a feature flag with TypeScript generics.
+Returns the resolved value of a feature flag with a typed fallback.
 
 ```typescript
 // String variant
-const variant = flagify.getValue<string>('checkout-flow')
+const variant = flagify.getValue<string>('checkout-flow', 'control')
 
 // Number
-const limit = flagify.getValue<number>('rate-limit')
+const limit = flagify.getValue<number>('rate-limit', 100)
 
 // JSON object
-const config = flagify.getValue<{ maxRetries: number; timeout: number }>('api-config')
+const config = flagify.getValue<{ maxRetries: number; timeout: number }>('api-config', {
+  maxRetries: 3,
+  timeout: 5000,
+})
+```
+
+---
+
+### `flagify.getVariant(flagKey: string, fallback: string): string`
+
+Returns the string variant of a multivariate flag. Returns the variant with the highest weight, or the fallback if the flag has no variants or is disabled.
+
+```typescript
+const variant = flagify.getVariant('checkout-flow', 'control')
+```
+
+---
+
+### `flagify.evaluate(flagKey: string, user: FlagifyUser): Promise<EvaluateResult>`
+
+Server-side evaluation with user targeting. Calls the Flagify API with user context for targeting rules.
+
+```typescript
+const result = await flagify.evaluate('premium-feature', {
+  id: 'user_123',
+  email: 'mario@example.com',
+  role: 'admin',
+})
+// result: { key: 'premium-feature', value: true, reason: 'targeting_rule' }
+```
+
+---
+
+### `flagify.ready(): Promise<void>`
+
+Resolves when the initial flag sync is complete. Useful in server startup sequences.
+
+```typescript
+const flagify = new Flagify({ projectKey: 'proj_xxx', publicKey: 'pk_xxx' })
+await flagify.ready()
+```
+
+---
+
+### `flagify.destroy(): void`
+
+Disconnects the realtime listener, stops polling, and cleans up resources.
+
+```typescript
+flagify.destroy()
+```
+
+---
+
+### `flagify.onFlagChange`
+
+Callback invoked when a flag changes via SSE or background refetch.
+
+```typescript
+flagify.onFlagChange = (event) => {
+  console.log(`Flag ${event.flagKey} was ${event.action}`)
+}
 ```
 
 ## How it works
@@ -213,6 +271,10 @@ import type {
   FlagifyUser,
   FlagifyFlaggy,
   IFlagifyClient,
+  EvaluateResult,
+  FlagChangeEvent,
+  RealtimeEvents,
+  RealtimeListener,
 } from '@flagify/node'
 ```
 
@@ -222,8 +284,8 @@ We welcome contributions. Please open an issue first to discuss what you'd like 
 
 ```bash
 # Clone
-git clone https://github.com/flagifyhq/node-sdk.git
-cd node-sdk
+git clone https://github.com/flagifyhq/javascript.git
+cd javascript
 
 # Install
 pnpm install
