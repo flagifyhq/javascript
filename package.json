@@ -8,7 +8,8 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "version:set": "pnpm -r exec -- npm version $VERSION --no-git-tag-version"
   },
   "devDependencies": {
     "barrelsby": "^2.8.1",
