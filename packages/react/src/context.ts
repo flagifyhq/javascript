@@ -8,8 +8,13 @@ export interface FlagifyContextValue {
   version: number
 }
 
-export const FlagifyContext = createContext<FlagifyContextValue>({
+/** Sentinel value — when context equals this, no provider exists */
+const NO_PROVIDER: FlagifyContextValue = {
   client: null,
   isReady: false,
-  version: 0,
-})
+  version: -1,
+}
+
+export const FlagifyContext = createContext<FlagifyContextValue>(NO_PROVIDER)
+
+export { NO_PROVIDER }
