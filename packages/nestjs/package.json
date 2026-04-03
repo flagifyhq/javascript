@@ -1,0 +1,72 @@
+{
+  "name": "@flagify/nestjs",
+  "version": "0.0.1",
+  "description": "NestJS integration for Flagify — module, service, guards, and decorators for feature flag evaluation.",
+  "author": "Mario Campbell R <mario@mariocampbellr.com>",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/flagify-testing.module.d.ts",
+      "import": "./dist/testing/flagify-testing.module.mjs",
+      "require": "./dist/testing/flagify-testing.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "barrelsby -c ./barrelsby.json",
+    "build": "pnpm run generate && tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=10.0.0",
+    "@nestjs/core": ">=10.0.0",
+    "reflect-metadata": ">=0.1.13"
+  },
+  "dependencies": {
+    "@flagify/node": "workspace:*"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/testing": "^10.0.0",
+    "@swc/core": "^1.15.21",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.15.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0"
+  },
+  "keywords": [
+    "feature-flags",
+    "flagify",
+    "nestjs",
+    "nest",
+    "module",
+    "guard",
+    "decorator"
+  ],
+  "homepage": "https://flagify.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flagifyhq/javascript",
+    "directory": "packages/nestjs"
+  },
+  "bugs": {
+    "url": "https://github.com/flagifyhq/javascript/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
