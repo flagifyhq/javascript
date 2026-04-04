@@ -56,7 +56,9 @@ export interface FlagifyFlaggy {
     segmentId?: string
     valueOverride?: unknown
     rolloutPercentage?: number
+    rolloutSalt?: string
     enabled: boolean
+    matchType?: 'ALL' | 'ANY'
     conditions?: Array<{
       attribute: string
       operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'in' | 'not_in' | 'gt' | 'lt'
