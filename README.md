@@ -24,8 +24,10 @@
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [`@flagify/node`](./packages/node) | [![npm](https://img.shields.io/npm/v/@flagify/node?style=flat-square&color=0D80F9)](https://www.npmjs.com/package/@flagify/node) | Node.js SDK -- TypeScript-first, in-memory cache |
-| [`@flagify/react`](./packages/react) | [![npm](https://img.shields.io/npm/v/@flagify/react?style=flat-square&color=0D80F9)](https://www.npmjs.com/package/@flagify/react) | React SDK -- hooks and provider |
+| [`@flagify/node`](./packages/node) | [![npm](https://img.shields.io/npm/v/@flagify/node?style=flat-square&color=0D80F9)](https://www.npmjs.com/package/@flagify/node) | Node.js SDK — TypeScript-first, in-memory cache, streaming sync |
+| [`@flagify/react`](./packages/react) | [![npm](https://img.shields.io/npm/v/@flagify/react?style=flat-square&color=0D80F9)](https://www.npmjs.com/package/@flagify/react) | React SDK — hooks and provider |
+| [`@flagify/nestjs`](./packages/nestjs) | [![npm](https://img.shields.io/npm/v/@flagify/nestjs?style=flat-square&color=0D80F9)](https://www.npmjs.com/package/@flagify/nestjs) | NestJS integration — module, service, guards, decorators |
+| [`@flagify/astro`](./packages/astro) | [![npm](https://img.shields.io/npm/v/@flagify/astro?style=flat-square&color=0D80F9)](https://www.npmjs.com/package/@flagify/astro) | Astro integration — middleware, dev toolbar, Vercel Flags adapter |
 
 ## Getting started
 
@@ -35,6 +37,12 @@ pnpm add @flagify/node
 
 # React
 pnpm add @flagify/react
+
+# NestJS
+pnpm add @flagify/nestjs
+
+# Astro
+pnpm add @flagify/astro @flagify/node
 ```
 
 See each package's README for usage instructions.
@@ -59,8 +67,10 @@ pnpm run generate
 
 ```
 packages/
-  node/     @flagify/node    -- Core SDK with flag evaluation and caching
-  react/    @flagify/react   -- React hooks and context provider
+  node/     @flagify/node    — Core SDK with flag evaluation and caching
+  react/    @flagify/react   — React hooks and context provider
+  nestjs/   @flagify/nestjs  — NestJS module, service, guard, and decorators
+  astro/    @flagify/astro   — Astro integration with dev toolbar and Vercel adapter
 ```
 
 ## License
