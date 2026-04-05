@@ -4,6 +4,7 @@ export interface RealtimeEvents {
   onFlagChange: (event: FlagChangeEvent) => void;
   onConnected: () => void;
   onReconnected: () => void;
+  onInitialSync: (flags: unknown[]) => void;
   onError: (error: Error) => void;
 }
 
@@ -115,6 +116,16 @@ export class RealtimeListener {
       } else {
         this.hasConnectedBefore = true;
         this.events.onConnected();
+      }
+      return;
+    }
+
+    if (eventType === "initial_sync" && data) {
+      try {
+        const flags = JSON.parse(data) as unknown[];
+        this.events.onInitialSync(flags);
+      } catch {
+        console.warn("[Flagify] Failed to parse initial_sync event:", data);
       }
       return;
     }
