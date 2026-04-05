@@ -138,16 +138,14 @@ describe("React hooks", () => {
   });
 
   describe("useFlagifyClient", () => {
-    it("throws when used outside provider (client is null)", () => {
-      const { result } = renderHook(() => {
-        try {
-          return useFlagifyClient();
-        } catch (e) {
-          return e;
-        }
-      });
-      expect(result.current).toBeInstanceOf(Error);
-      expect((result.current as Error).message).toContain("FlagifyProvider");
+    it("returns null and warns when used outside provider", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { result } = renderHook(() => useFlagifyClient());
+      expect(result.current).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("FlagifyProvider")
+      );
+      warnSpy.mockRestore();
     });
 
     it("returns client when inside provider", () => {
