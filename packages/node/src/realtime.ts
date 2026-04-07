@@ -44,6 +44,7 @@ export class RealtimeListener {
       this.controller = null;
     }
     this.reconnectAttempts = 0;
+    this.hasConnectedBefore = false;
   }
 
   private async stream(signal: AbortSignal): Promise<void> {

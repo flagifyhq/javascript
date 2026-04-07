@@ -308,7 +308,9 @@ export class Flagify implements IFlagifyClient {
 
         const user = this.config.options?.user;
         if (user) {
-          this.evaluateWithUser(user);
+          this.evaluateWithUser(user).catch((err) => {
+            console.warn("[Flagify] Failed to evaluate flags after initial sync:", err);
+          });
         }
       },
       onFlagChange: (event) => {
