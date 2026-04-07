@@ -18,6 +18,10 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
     "x-api-key": config.publicKey,
   };
 
+  if (config.secretKey) {
+    headers["x-secret-key"] = config.secretKey;
+  }
+
   return {
     baseUrl,
     headers,
