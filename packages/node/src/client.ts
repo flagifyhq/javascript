@@ -22,6 +22,7 @@ export class Flagify implements IFlagifyClient {
   private realtime: RealtimeListener | null = null;
   private readyPromise: Promise<void>;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private inflightRefetches: Map<string, Promise<void>> = new Map();
 
   /** Called when a flag changes via SSE. Useful for triggering React re-renders. */
   onFlagChange: ((event: FlagChangeEvent) => void) | null = null;
@@ -51,7 +52,7 @@ export class Flagify implements IFlagifyClient {
     if (!cached) return fallback;
 
     if (this.isStale(cached)) {
-      this.refetchFlag(flagKey);
+      this.refetchFlagDeduped(flagKey);
     }
 
     if (!cached.flag.enabled) return cached.flag.offValue as T;
@@ -64,7 +65,7 @@ export class Flagify implements IFlagifyClient {
     if (!cached) return false;
 
     if (this.isStale(cached)) {
-      this.refetchFlag(flagKey);
+      this.refetchFlagDeduped(flagKey);
     }
 
     if (cached.flag.type !== "boolean") return false;
@@ -80,14 +81,42 @@ export class Flagify implements IFlagifyClient {
     const variants = cached.flag.variants;
     if (!variants || variants.length === 0) return fallback;
 
-    // Return the variant key with the highest weight
-    let best = variants[0];
-    for (let i = 1; i < variants.length; i++) {
-      if (variants[i].weight > best.weight) {
-        best = variants[i];
+    const userId = this.config.options?.user?.id;
+    if (!userId) {
+      // No user context — deterministic pick by highest weight
+      let best = variants[0];
+      for (let i = 1; i < variants.length; i++) {
+        if (variants[i].weight > best.weight) best = variants[i];
       }
+      return best.key;
     }
-    return best.key;
+
+    // Deterministic distribution: hash(userId + flagKey) → bucket → variant
+    const hashValue = this.hashString(`${userId}:${flagKey}`);
+    const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
+    if (totalWeight === 0) return fallback;
+
+    const bucket = hashValue % totalWeight;
+    let cumulative = 0;
+    for (const variant of variants) {
+      cumulative += variant.weight;
+      if (bucket < cumulative) return variant.key;
+    }
+
+    return fallback;
+  }
+
+  /**
+   * FNV-1a 32-bit hash — fast, good distribution, deterministic.
+   * Used for consistent variant assignment across sessions.
+   */
+  private hashString(input: string): number {
+    let hash = 0x811c9dc5; // FNV offset basis
+    for (let i = 0; i < input.length; i++) {
+      hash ^= input.charCodeAt(i);
+      hash = (hash * 0x01000193) >>> 0; // FNV prime, keep as uint32
+    }
+    return hash;
   }
 
   async evaluate(flagKey: string, user: FlagifyUser): Promise<EvaluateResult> {
@@ -110,6 +139,16 @@ export class Flagify implements IFlagifyClient {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+
+    this.inflightRefetches.clear();
+  }
+
+  private refetchFlagDeduped(flagKey: string): void {
+    if (this.inflightRefetches.has(flagKey)) return;
+    const p = this.refetchFlag(flagKey).finally(() => {
+      this.inflightRefetches.delete(flagKey);
+    });
+    this.inflightRefetches.set(flagKey, p);
   }
 
   private isStale(cached: CachedFlag): boolean {
@@ -215,9 +254,9 @@ export class Flagify implements IFlagifyClient {
     }
 
     if (missing.length > 0) {
-      console.error(
-        `[Flagify] Missing required config keys: ${missing.join(", ")}`,
-        "All feature flags will be disabled.",
+      throw new Error(
+        `[Flagify] Missing required config keys: ${missing.join(", ")}. ` +
+          `Cannot initialize the Flagify client.`,
       );
     }
   }

@@ -3,8 +3,8 @@ import { FlagifyOptions } from "../types/FlagifyTypes";
 export interface FlagifyHttpClient {
   get<T = unknown>(path: string): Promise<T>;
   post<T = unknown, B = unknown>(path: string, body: B): Promise<T>;
-  baseUrl: string;
-  headers: Record<string, string>;
+  readonly baseUrl: string;
+  readonly headers: Readonly<Record<string, string>>;
 }
 
 export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
@@ -18,9 +18,15 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
     "x-api-key": config.publicKey,
   };
 
+  if (config.secretKey) {
+    headers["x-secret-key"] = config.secretKey;
+  }
+
+  const frozenHeaders: Readonly<Record<string, string>> = Object.freeze({ ...headers });
+
   return {
     baseUrl,
-    headers,
+    headers: frozenHeaders,
 
     get: async <T = unknown>(path: string): Promise<T> => {
       const res = await fetch(`${baseUrl}${path}`, {

@@ -1,7 +1,6 @@
 import { Module, DynamicModule, MiddlewareConsumer, NestModule } from '@nestjs/common'
 import type { NestMiddleware } from '@nestjs/common'
-import type { Request, Response, NextFunction } from 'express'
-import { FLAGIFY_OPTIONS } from './flagify.constants'
+import { FLAGIFY_OPTIONS, FLAGIFY_SERVICE_REQUEST_KEY } from './flagify.constants'
 import { FlagifyService } from './flagify.service'
 import { FeatureFlagGuard } from './guards/feature-flag.guard'
 import type { FlagifyModuleOptions, FlagifyModuleAsyncOptions } from './types/module-options'
@@ -15,8 +14,8 @@ export class FlagifyModule implements NestModule {
     consumer
       .apply(
         class implements NestMiddleware {
-          use(req: Request, _res: Response, next: NextFunction) {
-            ;(req as any).__flagifyService = service
+          use(req: Record<string, unknown>, _res: unknown, next: () => void) {
+            req[FLAGIFY_SERVICE_REQUEST_KEY] = service
             next()
           }
         },

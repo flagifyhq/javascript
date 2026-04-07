@@ -1,6 +1,8 @@
-import { initClient, waitForClient } from "./client";
+import { initClient, waitForClient, getClient } from "./client";
 
 const OVERRIDE_COOKIE = "flagify-overrides";
+
+let initialized = false;
 
 /**
  * Astro middleware that initializes the Flagify client and parses
@@ -15,15 +17,18 @@ const OVERRIDE_COOKIE = "flagify-overrides";
  * ```
  */
 export const onRequest = async (context: any, next: () => Promise<Response>) => {
-  // Lazy-init the singleton client on first request
-  const env = (import.meta as any).env ?? {};
-  const projectKey: string = env.FLAGIFY_PROJECT_KEY ?? "";
-  const publicKey: string = env.FLAGIFY_PUBLIC_KEY ?? "";
-  const secretKey: string | undefined = env.FLAGIFY_SECRET_KEY;
+  // Lazy-init the singleton client once on first request
+  if (!initialized && !getClient()) {
+    const env = (import.meta as any).env ?? {};
+    const projectKey: string = env.FLAGIFY_PROJECT_KEY ?? "";
+    const publicKey: string = env.FLAGIFY_PUBLIC_KEY ?? "";
+    const secretKey: string | undefined = env.FLAGIFY_SECRET_KEY;
 
-  if (projectKey && publicKey) {
-    initClient({ projectKey, publicKey, secretKey });
-    await waitForClient();
+    if (projectKey && publicKey) {
+      initClient({ projectKey, publicKey, secretKey });
+      await waitForClient();
+    }
+    initialized = true;
   }
 
   // Parse override cookie and attach to locals

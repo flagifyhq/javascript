@@ -21,16 +21,19 @@ export function defineFlag<T>(definition: FlagDefinition<T>): FlagEvaluator<T> {
   const evaluate = async (astro: {
     cookies: { get(name: string): { value: string } | undefined };
   }): Promise<T> => {
-    // 1. Check override cookie first (dev overrides take priority)
-    const overrideCookie = astro.cookies.get(OVERRIDE_COOKIE);
-    if (overrideCookie) {
-      try {
-        const overrides = JSON.parse(overrideCookie.value);
-        if (definition.key in overrides) {
-          return overrides[definition.key] as T;
+    // 1. Check override cookie — only in development to prevent production bypass
+    const isDev = (import.meta as any).env?.DEV === true;
+    if (isDev) {
+      const overrideCookie = astro.cookies.get(OVERRIDE_COOKIE);
+      if (overrideCookie) {
+        try {
+          const overrides = JSON.parse(overrideCookie.value);
+          if (definition.key in overrides) {
+            return overrides[definition.key] as T;
+          }
+        } catch {
+          // malformed cookie, ignore
         }
-      } catch {
-        // malformed cookie, ignore
       }
     }
 
