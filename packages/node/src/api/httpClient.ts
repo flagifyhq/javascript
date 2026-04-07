@@ -7,6 +7,8 @@ export interface FlagifyHttpClient {
   readonly headers: Readonly<Record<string, string>>;
 }
 
+const DEFAULT_TIMEOUT_MS = 10_000;
+
 export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
   const baseUrl =
     config.options?.apiUrl ??
@@ -16,6 +18,7 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-api-key": config.publicKey,
+    "x-project-key": config.projectKey,
   };
 
   if (config.secretKey) {
@@ -32,6 +35,7 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
       const res = await fetch(`${baseUrl}${path}`, {
         method: "GET",
         headers,
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -49,6 +53,7 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
       if (!res.ok) {

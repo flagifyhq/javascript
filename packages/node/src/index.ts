@@ -5,6 +5,6 @@
 export * from './client'
 export * from './realtime'
 export * from './types/FlagifyClient'
-export * from './types/FlagifyFlaggy'
+export * from './types/FlagifyFlag'
 export * from './types/FlagifyTypes'
 export * from './types/FlagifyUser'

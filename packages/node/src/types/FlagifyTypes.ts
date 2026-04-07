@@ -33,7 +33,7 @@ export interface FlagifyOptions {
 
     /**
      * Custom base URL for the Flagify API (e.g., for self-hosted instances or testing).
-     * Defaults to "https://api.flagify.app" if not provided.
+     * Defaults to "https://api.flagify.dev" if not provided.
      */
     apiUrl?: string;
 

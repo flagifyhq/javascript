@@ -1,7 +1,7 @@
 /**
  * Represents a feature flag within the Flagify system.
  */
-export interface FlagifyFlaggy {
+export interface FlagifyFlag {
   /**
    * Unique identifier for the flag (e.g., "new-dashboard").
    */

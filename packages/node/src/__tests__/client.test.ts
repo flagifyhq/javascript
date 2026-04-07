@@ -5,9 +5,9 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 import { Flagify } from "../client";
-import type { FlagifyFlaggy } from "../types/FlagifyFlaggy";
+import type { FlagifyFlag } from "../types/FlagifyFlag";
 
-function makeFlag(overrides: Partial<FlagifyFlaggy> = {}): FlagifyFlaggy {
+function makeFlag(overrides: Partial<FlagifyFlag> = {}): FlagifyFlag {
   return {
     key: "test-flag",
     name: "Test Flag",
@@ -335,7 +335,7 @@ describe("Flagify client", () => {
       await client.ready();
 
       const onChange = vi.fn();
-      client.onFlagChange = onChange;
+      client.onFlagChange(onChange);
 
       mockFetchResponse([makeFlag()]);
       await vi.advanceTimersByTimeAsync(500);
@@ -385,7 +385,7 @@ describe("Flagify client", () => {
       await client.ready();
 
       const onChange = vi.fn();
-      client.onFlagChange = onChange;
+      client.onFlagChange(onChange);
 
       // Wait for the flag to become stale
       await new Promise((r) => setTimeout(r, 5));
