@@ -328,7 +328,7 @@ Types re-exported from `@flagify/node`:
 |--------|-------------|
 | `FlagifyOptions` | Client configuration |
 | `FlagifyUser` | User context for targeting |
-| `FlagifyFlaggy` | Flag data structure |
+| `FlagifyFlag` | Flag data structure |
 | `IFlagifyClient` | Client interface |
 
 ## Contributing

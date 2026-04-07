@@ -20,7 +20,7 @@ export function FlagifyProvider({ children, ...config }: FlagifyProviderProps) {
     const instance = new Flagify(config)
     clientRef.current = instance
 
-    instance.onFlagChange = bumpVersion
+    const unsubscribe = instance.onFlagChange(bumpVersion)
 
     instance.ready().then(() => {
       // Only set state if this instance is still current
@@ -32,10 +32,10 @@ export function FlagifyProvider({ children, ...config }: FlagifyProviderProps) {
 
     return () => {
       clientRef.current = null
-      instance.onFlagChange = null
+      unsubscribe()
       instance.destroy()
     }
-  }, [config.projectKey, config.publicKey])
+  }, [config.projectKey, config.publicKey, config.secretKey, config.options?.user?.id, config.options?.realtime, config.options?.pollIntervalMs, config.options?.apiUrl])
 
   return (
     <FlagifyContext.Provider value={{ client, isReady, version }}>

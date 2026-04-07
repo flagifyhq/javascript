@@ -269,7 +269,7 @@ All types are exported for convenience:
 import type {
   FlagifyOptions,
   FlagifyUser,
-  FlagifyFlaggy,
+  FlagifyFlag,
   IFlagifyClient,
   EvaluateResult,
   FlagChangeEvent,

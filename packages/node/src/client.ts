@@ -1,7 +1,7 @@
 import { createHttpClient, FlagifyHttpClient } from "./api/httpClient";
 import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
-import { FlagifyFlaggy } from "./types/FlagifyFlaggy";
+import { FlagifyFlag } from "./types/FlagifyFlag";
 import { FlagifyOptions } from "./types/FlagifyTypes";
 import { FlagifyUser } from "./types/FlagifyUser";
 
@@ -12,7 +12,7 @@ export interface EvaluateResult {
 }
 
 type CachedFlag = {
-  flag: FlagifyFlaggy;
+  flag: FlagifyFlag;
   lastFetchedAt: number;
 };
 
@@ -24,8 +24,7 @@ export class Flagify implements IFlagifyClient {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private inflightRefetches: Map<string, Promise<void>> = new Map();
 
-  /** Called when a flag changes via SSE. Useful for triggering React re-renders. */
-  onFlagChange: ((event: FlagChangeEvent) => void) | null = null;
+  private flagChangeListeners: Set<(event: FlagChangeEvent) => void> = new Set();
 
   constructor(private readonly config: FlagifyOptions) {
     this.validateConfig();
@@ -44,6 +43,18 @@ export class Flagify implements IFlagifyClient {
   /** Resolves when the initial flag sync is complete. */
   ready(): Promise<void> {
     return this.readyPromise;
+  }
+
+  /** Subscribe to flag change events. Returns an unsubscribe function. */
+  onFlagChange(listener: (event: FlagChangeEvent) => void): () => void {
+    this.flagChangeListeners.add(listener);
+    return () => this.flagChangeListeners.delete(listener);
+  }
+
+  private emitFlagChange(event: FlagChangeEvent): void {
+    for (const listener of this.flagChangeListeners) {
+      listener(event);
+    }
   }
 
   getValue<T>(flagKey: string, fallback: T): T {
@@ -141,6 +152,7 @@ export class Flagify implements IFlagifyClient {
     }
 
     this.inflightRefetches.clear();
+    this.flagChangeListeners.clear();
   }
 
   private refetchFlagDeduped(flagKey: string): void {
@@ -163,7 +175,7 @@ export class Flagify implements IFlagifyClient {
 
   private async refetchFlag(flagKey: string) {
     try {
-      const fresh = await this.httpClient.get<FlagifyFlaggy>(
+      const fresh = await this.httpClient.get<FlagifyFlag>(
         `/v1/eval/flags/${flagKey}`,
       );
       this.flagCache.set(flagKey, {
@@ -176,7 +188,7 @@ export class Flagify implements IFlagifyClient {
       if (user) {
         const result = await this.httpClient.post<{
           key: string;
-          value: FlagifyFlaggy["value"];
+          value: FlagifyFlag["value"];
           reason: string;
         }>(`/v1/eval/flags/${flagKey}/evaluate`, {
           userId: user.id,
@@ -191,7 +203,7 @@ export class Flagify implements IFlagifyClient {
         }
       }
 
-      this.onFlagChange?.({
+      this.emitFlagChange({
         environmentId: "",
         flagKey,
         action: "updated",
@@ -201,30 +213,37 @@ export class Flagify implements IFlagifyClient {
     }
   }
 
-  private async syncFlags(): Promise<void> {
-    try {
-      const flags = await this.httpClient.get<FlagifyFlaggy[]>(`/v1/eval/flags`);
+  private async syncFlags(retries = 1): Promise<void> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const flags = await this.httpClient.get<FlagifyFlag[]>(`/v1/eval/flags`);
 
-      for (const flag of flags) {
-        this.flagCache.set(flag.key, {
-          flag,
-          lastFetchedAt: Date.now(),
-        });
-      }
+        for (const flag of flags) {
+          this.flagCache.set(flag.key, {
+            flag,
+            lastFetchedAt: Date.now(),
+          });
+        }
 
-      const user = this.config.options?.user;
-      if (user) {
-        await this.evaluateWithUser(user);
+        const user = this.config.options?.user;
+        if (user) {
+          await this.evaluateWithUser(user);
+        }
+        return;
+      } catch (err) {
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        } else {
+          console.warn(`[Flagify] Failed to sync flags after ${retries + 1} attempts: ${err}`);
+        }
       }
-    } catch (err) {
-      console.warn(`[Flagify] Failed to sync flags: ${err}`);
     }
   }
 
   private async evaluateWithUser(user: FlagifyUser): Promise<void> {
     try {
       const results = await this.httpClient.post<
-        Array<{ key: string; value: FlagifyFlaggy["value"]; reason: string }>,
+        Array<{ key: string; value: FlagifyFlag["value"]; reason: string }>,
         { userId: string; attributes: FlagifyUser }
       >(`/v1/eval/flags/evaluate`, { userId: user.id, attributes: user });
 
@@ -265,7 +284,7 @@ export class Flagify implements IFlagifyClient {
     const interval = this.config.options!.pollIntervalMs!;
     this.pollTimer = setInterval(async () => {
       await this.syncFlags();
-      this.onFlagChange?.({ environmentId: "", flagKey: "*", action: "updated" });
+      this.emitFlagChange({ environmentId: "", flagKey: "*", action: "updated" });
     }, interval);
   }
 
@@ -279,7 +298,7 @@ export class Flagify implements IFlagifyClient {
       },
       onInitialSync: (flags) => {
         for (const raw of flags) {
-          const flag = raw as FlagifyFlaggy;
+          const flag = raw as FlagifyFlag;
           this.flagCache.set(flag.key, {
             flag,
             lastFetchedAt: Date.now(),
