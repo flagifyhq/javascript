@@ -1,5 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
 import type { FlagifyService } from '../flagify.service'
+import { FLAGIFY_SERVICE_REQUEST_KEY } from '../flagify.constants'
 
 export interface FeatureFlagParamOptions {
   key: string
@@ -24,8 +25,8 @@ export const FeatureFlag = createParamDecorator(
       ? { key: data }
       : data
 
-    const request = ctx.switchToHttp().getRequest()
-    const flagifyService: FlagifyService | undefined = request.__flagifyService
+    const request = ctx.switchToHttp().getRequest<Record<string, unknown>>()
+    const flagifyService = request[FLAGIFY_SERVICE_REQUEST_KEY] as FlagifyService | undefined
 
     if (!flagifyService) {
       return options.fallback ?? null

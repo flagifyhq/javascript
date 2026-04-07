@@ -99,16 +99,20 @@ export class RealtimeListener {
 
   private parseSSEFrame(frame: string): void {
     let eventType = "";
-    let data = "";
+    const dataLines: string[] = [];
 
     for (const line of frame.split("\n")) {
       if (line.startsWith("event: ")) {
         eventType = line.slice(7).trim();
       } else if (line.startsWith("data: ")) {
-        data = line.slice(6).trim();
+        dataLines.push(line.slice(6));
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5));
       }
       // Ignore comment lines (heartbeat `: heartbeat`)
     }
+
+    const data = dataLines.join("\n").trim();
 
     if (eventType === "connected") {
       if (this.hasConnectedBefore) {
