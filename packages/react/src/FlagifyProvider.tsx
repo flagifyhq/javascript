@@ -17,7 +17,15 @@ export function FlagifyProvider({ children, ...config }: FlagifyProviderProps) {
   }, [])
 
   useEffect(() => {
-    const instance = new Flagify(config)
+    let instance: Flagify
+
+    try {
+      instance = new Flagify(config)
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err))
+      return
+    }
+
     clientRef.current = instance
 
     const unsubscribe = instance.onFlagChange(bumpVersion)
