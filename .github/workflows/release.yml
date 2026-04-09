@@ -57,7 +57,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           echo "Publishing version $VERSION"
-          pnpm -r exec -- npm version "$VERSION" --no-git-tag-version
+          pnpm -r exec -- npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
         run: pnpm -r publish --no-git-checks --access public
