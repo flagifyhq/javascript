@@ -1,4 +1,6 @@
-import { createHttpClient, FlagifyHttpClient } from "./api/httpClient";
+import { createHttpClient, FlagifyHttpClient, FlagifyAuthError } from "./api/httpClient";
+
+export { FlagifyAuthError };
 import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
 import { FlagifyFlag } from "./types/FlagifyFlag";
@@ -262,20 +264,23 @@ export class Flagify implements IFlagifyClient {
   }
 
   private validateConfig() {
-    const missing: string[] = [];
+    const errors: string[] = [];
 
-    if (!this.config.publicKey) {
-      missing.push("publicKey");
+    if (!this.config.publicKey || this.config.publicKey.trim() === "") {
+      errors.push("publicKey is empty. Provide a valid key (pk_*).");
+    } else if (!this.config.publicKey.startsWith("pk_")) {
+      errors.push(
+        `publicKey format invalid: expected "pk_<env>_<id>_<secret>", got "${this.config.publicKey.slice(0, 20)}..."`,
+      );
     }
 
-    if (!this.config.projectKey) {
-      missing.push("projectKey");
+    if (!this.config.projectKey || this.config.projectKey.trim() === "") {
+      errors.push("projectKey is empty.");
     }
 
-    if (missing.length > 0) {
+    if (errors.length > 0) {
       throw new Error(
-        `[Flagify] Missing required config keys: ${missing.join(", ")}. ` +
-          `Cannot initialize the Flagify client.`,
+        `[Flagify] ${errors.join(" ")} Cannot initialize the Flagify client.`,
       );
     }
   }

@@ -1,5 +1,15 @@
 import { FlagifyOptions } from "../types/FlagifyTypes";
 
+export class FlagifyAuthError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "FlagifyAuthError";
+  }
+}
+
 export interface FlagifyHttpClient {
   get<T = unknown>(path: string): Promise<T>;
   post<T = unknown, B = unknown>(path: string, body: B): Promise<T>;
@@ -8,6 +18,30 @@ export interface FlagifyHttpClient {
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+
+function throwForStatus(method: string, path: string, status: number, statusText: string): never {
+  if (status === 401) {
+    throw new FlagifyAuthError(
+      `[Flagify] Unauthorized (401) on ${method} ${path}: Invalid or revoked API key. Check your publicKey.`,
+      401,
+    );
+  }
+  if (status === 403) {
+    throw new FlagifyAuthError(
+      `[Flagify] Forbidden (403) on ${method} ${path}: API key does not have access to this resource.`,
+      403,
+    );
+  }
+  if (status === 404) {
+    throw new Error(
+      `[Flagify] Not Found (404) on ${method} ${path}: Check your apiUrl and projectKey configuration.`,
+    );
+  }
+  if (status >= 500) {
+    throw new Error(`[Flagify] Server error (${status}) on ${method} ${path}: ${statusText}`);
+  }
+  throw new Error(`[Flagify] Request failed (${status}) on ${method} ${path}: ${statusText}`);
+}
 
 export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
   const baseUrl =
@@ -39,10 +73,14 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
       });
 
       if (!res.ok) {
-        throw new Error(`[HTTP GET] ${res.status} ${res.statusText}`);
+        throwForStatus("GET", path, res.status, res.statusText);
       }
 
-      return res.json();
+      try {
+        return await res.json();
+      } catch {
+        throw new Error(`[Flagify] Invalid JSON response on GET ${path}`);
+      }
     },
 
     post: async <T = unknown, B = unknown>(
@@ -57,10 +95,14 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
       });
 
       if (!res.ok) {
-        throw new Error(`[HTTP POST] ${res.status} ${res.statusText}`);
+        throwForStatus("POST", path, res.status, res.statusText);
       }
 
-      return res.json();
+      try {
+        return await res.json();
+      } catch {
+        throw new Error(`[Flagify] Invalid JSON response on POST ${path}`);
+      }
     },
   };
 }

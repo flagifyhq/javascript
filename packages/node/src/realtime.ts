@@ -1,4 +1,4 @@
-import { FlagifyHttpClient } from "./api/httpClient";
+import { FlagifyHttpClient, FlagifyAuthError } from "./api/httpClient";
 
 export interface RealtimeEvents {
   onFlagChange: (event: FlagChangeEvent) => void;
@@ -17,11 +17,15 @@ export interface FlagChangeEvent {
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
+/** Status codes that will never succeed on retry with the same credentials. */
+const NON_RETRYABLE_CODES = new Set([401, 403]);
+
 export class RealtimeListener {
   private controller: AbortController | null = null;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hasConnectedBefore = false;
+  private permanentFailure = false;
 
   constructor(
     private readonly httpClient: FlagifyHttpClient,
@@ -29,6 +33,7 @@ export class RealtimeListener {
   ) {}
 
   connect(): void {
+    if (this.permanentFailure) return;
     this.disconnect();
     this.controller = new AbortController();
     this.stream(this.controller.signal);
@@ -59,6 +64,12 @@ export class RealtimeListener {
       );
 
       if (!res.ok) {
+        if (NON_RETRYABLE_CODES.has(res.status)) {
+          throw new FlagifyAuthError(
+            `[Flagify] Authentication failed (${res.status}). Realtime sync disabled. Check your publicKey.`,
+            res.status,
+          );
+        }
         throw new Error(`SSE connection failed: ${res.status} ${res.statusText}`);
       }
 
@@ -94,6 +105,14 @@ export class RealtimeListener {
 
       const error = err instanceof Error ? err : new Error(String(err));
       this.events.onError(error);
+
+      // Don't retry auth errors — they won't self-heal
+      if (err instanceof FlagifyAuthError) {
+        this.permanentFailure = true;
+        console.error(error.message);
+        return;
+      }
+
       this.scheduleReconnect();
     }
   }
