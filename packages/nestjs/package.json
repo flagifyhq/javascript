@@ -1,6 +1,6 @@
 {
   "name": "@flagify/nestjs",
-  "version": "0.0.1",
+  "version": "1.0.6",
   "description": "NestJS integration for Flagify — module, service, guards, and decorators for feature flag evaluation.",
   "author": "Mario Campbell R <mario@mariocampbellr.com>",
   "license": "MIT",

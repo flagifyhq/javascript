@@ -1,6 +1,6 @@
 {
   "name": "@flagify/react",
-  "version": "0.0.1",
+  "version": "1.0.6",
   "description": "React SDK for Flagify — hooks and provider for feature flag evaluation.",
   "author": "Mario Campbell R <mario@mariocampbellr.com>",
   "license": "MIT",
