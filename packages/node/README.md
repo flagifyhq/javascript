@@ -39,6 +39,7 @@
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
+- [User context & targeting](#user-context--targeting)
 - [API reference](#api-reference)
 - [How it works](#how-it-works)
 - [Environment variables](#environment-variables)
@@ -131,6 +132,74 @@ const flagify = new Flagify({
 | `options.realtime` | `boolean` | No | `false` | Enable real-time SSE updates |
 | `options.pollIntervalMs` | `number` | No | -- | Polling interval in ms for periodic flag sync |
 | `options.user` | `FlagifyUser` | No | -- | User context for targeting |
+
+## User context & targeting
+
+Targeting rules let a flag return different values per user (admins, paid plans, beta cohorts, geographies, etc.). The targeting rules themselves are configured server-side in the Flagify dashboard or API — the SDK only forwards the user attributes.
+
+There are two valid patterns, depending on whether your process serves one user or many.
+
+### Pattern 1 — long-lived single-user client
+
+Useful for CLIs, edge workers, single-tenant background jobs, or React Server Components that build a fresh client per request. Pass the user once via `options.user`; the client will fetch all flag values **already evaluated for that user** at startup. After `await ready()`, `isEnabled()`, `getValue()`, and `getVariant()` return the targeted values straight from the local cache.
+
+```typescript
+const flagify = new Flagify({
+  projectKey: 'proj_xxx',
+  publicKey: 'pk_xxx',
+  options: {
+    user: { id: 'u_42', role: 'admin', plan: 'enterprise' },
+  },
+})
+
+await flagify.ready()
+flagify.isEnabled('admin-tools') // true if the targeting rule matches role === 'admin'
+```
+
+### Pattern 2 — per-request evaluation (Express, Fastify, Next API routes)
+
+In a typical multi-tenant web server, the client is created once at startup with **no** `options.user`, and you call `await flagify.evaluate(key, user)` per request with the request's user. `evaluate()` calls the API, the server applies the targeting rules, and you get the result back.
+
+```typescript
+import express from 'express'
+import { Flagify } from '@flagify/node'
+
+const flagify = new Flagify({
+  projectKey: 'proj_xxx',
+  publicKey: 'pk_xxx',
+  options: { realtime: true },
+})
+await flagify.ready()
+
+const app = express()
+
+app.get('/admin', async (req, res) => {
+  const result = await flagify.evaluate('admin-tools', {
+    id: req.user.id,
+    role: req.user.role,
+    email: req.user.email,
+  })
+  if (!result.value) return res.status(403).end()
+  res.render('admin')
+})
+```
+
+The user object uses `id` (not `userId`) — the SDK serializes it to `userId` on the wire automatically.
+
+```typescript
+{
+  id: string                   // required
+  email?: string
+  role?: string
+  group?: string
+  geolocation?: { country?: string; region?: string; city?: string }
+  [key: string]: unknown       // any custom attribute
+}
+```
+
+`evaluate()` returns `{ key, value, reason }` where `reason` is one of `targeting_rule`, `rollout`, `default`, or `disabled`. See the [targeting docs](https://flagify.dev/docs/concepts/targeting) for the full list of operators and segment options.
+
+> **Don't mix the patterns in the React SDK.** In `@flagify/react`, the user goes in `<FlagifyProvider options={{ user }}>` once. Do not call `client.evaluate()` from a React hook per flag — it bypasses the cache and produces a flash of the wrong value. See [`@flagify/react` README](../react/README.md#user-context--targeting).
 
 ## API reference
 
