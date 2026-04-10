@@ -137,6 +137,8 @@ const flagify = new Flagify({
 
 Targeting rules let a flag return different values per user (admins, paid plans, beta cohorts, geographies, etc.). The targeting rules themselves are configured server-side in the Flagify dashboard or API — the SDK only forwards the user attributes.
 
+> **Since v1.1.0**, the SDK always runs the targeting engine on every sync — even when you don't pass `options.user`. Catch-all rules (no segment, no conditions) and rollout rules that don't depend on user identity apply to anonymous callers. Segment/condition rules simply don't match when the context is empty, which is the correct behavior for anonymous. You only need to pass `options.user` when you have user-specific targeting.
+
 There are two valid patterns, depending on whether your process serves one user or many.
 
 ### Pattern 1 — long-lived single-user client
@@ -162,6 +164,8 @@ flagify.isEnabled('admin-tools') // true if the targeting rule matches role === 
 ### Pattern 2 — per-request evaluation (Express, Fastify, Next API routes)
 
 In a typical multi-tenant web server, the client is created once at startup with **no** `options.user`, and you call `await flagify.evaluate(key, user)` per request with the request's user. `evaluate()` calls the API, the server applies the targeting rules, and you get the result back.
+
+Note: even without `options.user`, `isEnabled()` / `getValue()` / `getVariant()` work against the local cache and reflect catch-all and rollout rules (see the note above). Use `flagify.evaluate(key, user)` per request only when you need user-specific targeting (segment membership, conditions, etc.).
 
 ```typescript
 import express from 'express'

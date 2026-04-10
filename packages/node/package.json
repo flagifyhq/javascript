@@ -1,6 +1,6 @@
 {
   "name": "@flagify/node",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "description": "Official Flagify SDK for feature flag evaluation. TypeScript-first with local caching.",
   "author": "Mario Campbell R <mario@mariocampbellr.com>",
   "license": "MIT",
