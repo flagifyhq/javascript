@@ -159,6 +159,8 @@ The provider exposes the following context:
 
 Targeting rules let a flag return different values per user — for example, an `admin-tools` flag that's only `true` for users whose `role === 'admin'`, or a `beta-features` flag enabled for `plan === 'enterprise'`. **The targeting rules themselves are configured server-side** in the Flagify dashboard or API. The React SDK only forwards the user attributes.
 
+> **Since v1.1.0**, the Provider always asks the targeting engine on init — even when `options.user` is `undefined`. Catch-all rules and rollout rules that don't depend on user identity apply to anonymous visitors, so `useFlag('promo-banner')` reflects the rule result from the very first render (after `isReady`), not the raw `defaultValue`. You only need to pass `options.user` when you have rules that actually discriminate by user attributes.
+
 The pattern is one-shot, **not** per-flag:
 
 1. After the user is loaded by your auth layer, mount `<FlagifyProvider>` with `options.user`.
@@ -204,7 +206,7 @@ function AdminMenu() {
 
 ### Where to mount the Provider
 
-`<FlagifyProvider>` must be **below** the provider that loads your user, so the user is available when the Flagify client initializes. If the Provider mounts before the user is known, the cache will be populated as anonymous and `useFlag` will return the anonymous evaluations until the cache resyncs.
+`<FlagifyProvider>` must be **below** the provider that loads your user, so the user is available when the Flagify client initializes. If the Provider mounts before the user is known, the cache is populated with the **anonymous** evaluations — catch-all / rollout rules still apply correctly, but any rule that targets by user attributes will miss until the Provider remounts with the real user (use `key={user?.id ?? 'anonymous'}` to force that resync on login/logout).
 
 The simplest pattern is a thin wrapper that reads the user from your auth context and forwards it to `<FlagifyProvider>`:
 

@@ -229,7 +229,7 @@ destroyClient();
 
 ## SSG limitations
 
-In static builds (SSG), flags are evaluated at **build time** without user context. This works for global flags (kill switches, percentage rollouts) but not for user-targeted flags. For user-targeted evaluation, use SSR mode.
+In static builds (SSG), flags are evaluated at **build time** with no per-visitor user context. Since `@flagify/astro` v1.1.0, catch-all and rollout targeting rules are applied at build time against the anonymous context, so kill switches, global enables, and percentage rollouts are baked in correctly. Rules that target by user attributes (segments, conditions on `role`, `plan`, `email`, custom attrs, etc.) can't be evaluated at build time and will miss — for those, use SSR mode and pass the request's user to `flagify.evaluate(key, user)` per request.
 
 ## TypeScript
 
