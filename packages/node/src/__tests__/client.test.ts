@@ -40,6 +40,15 @@ function createClient(options = {}) {
 describe("Flagify client", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default response for any fetch call not explicitly mocked with
+    // `mockResolvedValueOnce` — an empty 200 body. Explicit one-shot
+    // responses still take precedence (queue drains first). This lets
+    // tests only mock the call they care about while the targeting
+    // eval POST that now always runs gets a harmless default.
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
   });
 
   describe("ready()", () => {
@@ -258,17 +267,70 @@ describe("Flagify client", () => {
       expect(client.isEnabled("analytics")).toBe(true);
     });
 
-    it("keeps original value when no user is provided", async () => {
+    it("runs the targeting engine even when no user is provided", async () => {
+      // Regression for the EVAL_FIX.md scenario: a flag with defaultValue=false
+      // and a catch-all targeting rule that serves `true`. Before the fix,
+      // syncFlags skipped the POST when no user was configured, so the cache
+      // held the raw default_value and isEnabled returned false. After the fix,
+      // the SDK always asks the engine, so catch-all rules apply to anonymous.
       mockFetchResponse([
-        makeFlag({ key: "analytics", type: "boolean", enabled: true, value: false }),
+        makeFlag({
+          key: "dev-tools",
+          type: "boolean",
+          enabled: true,
+          value: false,       // GET /v1/eval/flags returns raw default
+          defaultValue: false,
+          offValue: false,
+        }),
+      ]);
+      mockFetchResponse([
+        { key: "dev-tools", value: true, reason: "targeting_rule" },
       ]);
 
-      const client = createClient();
+      const client = createClient(); // no options.user
+
       await client.ready();
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      // Boolean flag: enabled=true, value=false → isEnabled()=false
-      expect(client.isEnabled("analytics")).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("/v1/eval/flags/evaluate"),
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(client.isEnabled("dev-tools")).toBe(true);
+    });
+
+    it("sends empty userId and empty attributes when anonymous", async () => {
+      mockFetchResponse([makeFlag()]);
+      mockFetchResponse([]);
+
+      createClient(); // no user
+
+      await vi.waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      const postCall = mockFetch.mock.calls[1];
+      const body = JSON.parse(postCall[1].body);
+      expect(body.userId).toBe("");
+      expect(body.attributes).toEqual({});
+    });
+
+    it("falls back gracefully if anonymous evaluate endpoint fails", async () => {
+      mockFetchResponse([
+        makeFlag({ key: "feat", type: "boolean", enabled: true, value: false }),
+      ]);
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+      });
+
+      const client = createClient(); // no user
+      await client.ready();
+
+      // POST failed — cache keeps the raw GET value, no crash.
+      expect(client.isEnabled("feat")).toBe(false);
     });
 
     it("sends userId and attributes in POST body", async () => {
@@ -309,19 +371,21 @@ describe("Flagify client", () => {
     it("calls syncFlags periodically when pollIntervalMs is set", async () => {
       vi.useFakeTimers();
 
-      // Initial sync
+      // Initial sync: GET + POST (engine always runs now)
       mockFetchResponse([makeFlag({ key: "feat", enabled: true, value: true })]);
+      mockFetchResponse([]);
 
       const client = createClient({ options: { pollIntervalMs: 1000 } });
       await client.ready();
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
 
-      // First poll
+      // First poll: GET + POST again
       mockFetchResponse([makeFlag({ key: "feat", enabled: true, value: false })]);
+      mockFetchResponse([]);
       await vi.advanceTimersByTimeAsync(1000);
 
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(4);
 
       client.destroy();
       vi.useRealTimers();
@@ -352,6 +416,7 @@ describe("Flagify client", () => {
       vi.useFakeTimers();
 
       mockFetchResponse([makeFlag()]);
+      mockFetchResponse([]);
       const client = createClient({ options: { pollIntervalMs: 500 } });
       await client.ready();
 
@@ -359,8 +424,8 @@ describe("Flagify client", () => {
 
       await vi.advanceTimersByTimeAsync(1500);
 
-      // Only the initial sync call, no poll calls
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Only the initial sync (GET + POST), no poll cycles.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
 
       vi.useRealTimers();
     });

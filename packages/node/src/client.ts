@@ -185,24 +185,23 @@ export class Flagify implements IFlagifyClient {
         lastFetchedAt: Date.now(),
       });
 
-      // Re-evaluate with user context if configured (targeting rules need it)
+      // Always run the targeting engine — catch-all / rollout rules apply
+      // even with no user context, so gating this on `options.user` would
+      // skip legitimate rule matches for anonymous visitors.
       const user = this.config.options?.user;
-      if (user) {
-        const result = await this.httpClient.post<{
-          key: string;
-          value: FlagifyFlag["value"];
-          reason: string;
-        }>(`/v1/eval/flags/${flagKey}/evaluate`, {
-          userId: user.id,
-          attributes: user,
+      const result = await this.httpClient.post<
+        { key: string; value: FlagifyFlag["value"]; reason: string },
+        { userId: string; attributes: Record<string, unknown> }
+      >(`/v1/eval/flags/${flagKey}/evaluate`, {
+        userId: user?.id ?? "",
+        attributes: user ?? {},
+      });
+      const cached = this.flagCache.get(flagKey);
+      if (cached) {
+        this.flagCache.set(flagKey, {
+          flag: { ...cached.flag, value: result.value },
+          lastFetchedAt: cached.lastFetchedAt,
         });
-        const cached = this.flagCache.get(flagKey);
-        if (cached) {
-          this.flagCache.set(flagKey, {
-            flag: { ...cached.flag, value: result.value },
-            lastFetchedAt: cached.lastFetchedAt,
-          });
-        }
       }
 
       this.emitFlagChange({
@@ -227,10 +226,13 @@ export class Flagify implements IFlagifyClient {
           });
         }
 
-        const user = this.config.options?.user;
-        if (user) {
-          await this.evaluateWithUser(user);
-        }
+        // Always run the targeting engine, even without user context.
+        // Catch-all rules (no segment, no conditions) should match
+        // regardless of who's asking — gating this on `options.user`
+        // used to leave anonymous visitors stuck on `default_value`,
+        // so e.g. `useFlag('dev-tools')` returned false for a flag
+        // whose only rule was "serve true to everyone".
+        await this.evaluateWithUser(this.config.options?.user);
         return;
       } catch (err) {
         if (attempt < retries) {
@@ -242,12 +244,15 @@ export class Flagify implements IFlagifyClient {
     }
   }
 
-  private async evaluateWithUser(user: FlagifyUser): Promise<void> {
+  private async evaluateWithUser(user?: FlagifyUser): Promise<void> {
     try {
       const results = await this.httpClient.post<
         Array<{ key: string; value: FlagifyFlag["value"]; reason: string }>,
-        { userId: string; attributes: FlagifyUser }
-      >(`/v1/eval/flags/evaluate`, { userId: user.id, attributes: user });
+        { userId: string; attributes: Record<string, unknown> }
+      >(`/v1/eval/flags/evaluate`, {
+        userId: user?.id ?? "",
+        attributes: user ?? {},
+      });
 
       for (const result of results) {
         const cached = this.flagCache.get(result.key);
@@ -259,7 +264,7 @@ export class Flagify implements IFlagifyClient {
         }
       }
     } catch (err) {
-      console.warn(`[Flagify] Failed to evaluate flags for user: ${err}`);
+      console.warn(`[Flagify] Failed to evaluate flags: ${err}`);
     }
   }
 
@@ -311,12 +316,10 @@ export class Flagify implements IFlagifyClient {
         }
         console.info(`[Flagify] Synced ${flags.length} flags via SSE`);
 
-        const user = this.config.options?.user;
-        if (user) {
-          this.evaluateWithUser(user).catch((err) => {
-            console.warn("[Flagify] Failed to evaluate flags after initial sync:", err);
-          });
-        }
+        // Always run the engine — see note in syncFlags().
+        this.evaluateWithUser(this.config.options?.user).catch((err) => {
+          console.warn("[Flagify] Failed to evaluate flags after initial sync:", err);
+        });
       },
       onFlagChange: (event) => {
         console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
