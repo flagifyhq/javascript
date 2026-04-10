@@ -98,8 +98,8 @@ const flagify = new Flagify({
     // Cache TTL in ms (default: 5 minutes)
     staleTimeMs: 300_000,
 
-    // Real-time updates via SSE (coming soon)
-    realtime: false,
+    // Real-time updates via SSE — pushes flag changes to the client instantly
+    realtime: true,
 
     // User context for targeting rules
     user: {
@@ -149,6 +149,9 @@ const flagify = new Flagify({
   publicKey: 'pk_xxx',
   options: {
     user: { id: 'u_42', role: 'admin', plan: 'enterprise' },
+    // For long-lived processes, enable realtime (or set pollIntervalMs) so the
+    // cache doesn't go stale after the one-shot startup sync.
+    realtime: true,
   },
 })
 
@@ -174,12 +177,21 @@ await flagify.ready()
 const app = express()
 
 app.get('/admin', async (req, res) => {
-  const result = await flagify.evaluate('admin-tools', {
-    id: req.user.id,
-    role: req.user.role,
-    email: req.user.email,
-  })
-  if (!result.value) return res.status(403).end()
+  // evaluate() makes a network call per request — always wrap in try/catch and
+  // pick a safe fallback so an API blip doesn't 500 your handler.
+  let allowed = false
+  try {
+    const result = await flagify.evaluate('admin-tools', {
+      id: req.user.id,
+      role: req.user.role,
+      email: req.user.email,
+    })
+    allowed = result.value === true
+  } catch (err) {
+    console.warn('[flagify] evaluate failed, denying access by default', err)
+  }
+
+  if (!allowed) return res.status(403).end()
   res.render('admin')
 })
 ```

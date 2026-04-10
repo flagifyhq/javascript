@@ -42,9 +42,10 @@
 - [Provider](#provider)
 - [User context & targeting](#user-context--targeting)
 - [Hooks](#hooks)
-  - [`useFlag`](#useflagflagkey-string-boolean)
+  - [`useFlag`](#useflagflagkey-string-boolean--undefined)
   - [`useVariant`](#usevariantflagkey-string-string--undefined)
   - [`useFlagValue`](#useflagvaluetflagkey-string-t--undefined)
+  - [`useIsReady`](#useisready-boolean)
   - [`useFlagifyClient`](#useflagifyclient-flagify)
 - [Examples](#examples)
 - [API reference](#api-reference)
@@ -193,9 +194,10 @@ function Root() {
 
 function AdminMenu() {
   // Already evaluated against targeting rules for the current user.
-  // Returns true only when the server-side rules say so for this user.
+  // useFlag returns `undefined` until the initial sync completes, so compare
+  // explicitly — don't assume truthiness.
   const canSeeAdmin = useFlag('admin-tools')
-  if (!canSeeAdmin) return null
+  if (canSeeAdmin !== true) return null
   return <Admin />
 }
 ```
@@ -204,16 +206,43 @@ function AdminMenu() {
 
 `<FlagifyProvider>` must be **below** the provider that loads your user, so the user is available when the Flagify client initializes. If the Provider mounts before the user is known, the cache will be populated as anonymous and `useFlag` will return the anonymous evaluations until the cache resyncs.
 
+The simplest pattern is a thin wrapper that reads the user from your auth context and forwards it to `<FlagifyProvider>`:
+
 ```tsx
-<AuthProvider>
-  <FlagifyProviderWithUser>  {/* reads user from auth, then mounts <FlagifyProvider> with key={user.id} */}
-    <ReactQueryProvider>
-      <Router>
-        {/* the rest of your app */}
-      </Router>
-    </ReactQueryProvider>
-  </FlagifyProviderWithUser>
-</AuthProvider>
+import { FlagifyProvider } from '@flagify/react'
+import { useCurrentUser } from './auth'
+
+function AppFlagifyProvider({ children }: { children: React.ReactNode }) {
+  const user = useCurrentUser()
+
+  return (
+    <FlagifyProvider
+      key={user?.id ?? 'anonymous'}
+      projectKey="proj_xxx"
+      publicKey="pk_xxx"
+      options={{
+        realtime: true,
+        user: user
+          ? { id: user.id, role: user.role, email: user.email }
+          : undefined,
+      }}
+    >
+      {children}
+    </FlagifyProvider>
+  )
+}
+
+function Root() {
+  return (
+    <AuthProvider>
+      <AppFlagifyProvider>
+        <ReactQueryProvider>
+          <Router>{/* the rest of your app */}</Router>
+        </ReactQueryProvider>
+      </AppFlagifyProvider>
+    </AuthProvider>
+  )
+}
 ```
 
 ### User object shape
@@ -239,16 +268,19 @@ For server-side per-request evaluation (e.g. inside Next.js API routes or Expres
 
 ## Hooks
 
-### `useFlag(flagKey: string): boolean`
+### `useFlag(flagKey: string): boolean | undefined`
 
-Evaluates a boolean feature flag. Returns `false` if the flag doesn't exist or is disabled.
+Evaluates a boolean feature flag. Returns `undefined` while the client is still syncing (`isReady === false`), then `true`/`false` once the cache is populated. Returns `false` for missing or disabled flags.
+
+Because the first render can be `undefined`, gate on an explicit comparison (or use [`useIsReady`](#useisready-boolean)) instead of relying on truthiness — especially for flags whose "off" state is visible UI.
 
 ```tsx
 function Dashboard() {
   const isNew = useFlag('new-dashboard')
 
-  if (!isNew) return <LegacyDashboard />
-  return <NewDashboard />
+  // Wait for sync before deciding — avoids a flash of the legacy dashboard.
+  if (isNew === undefined) return <Spinner />
+  return isNew ? <NewDashboard /> : <LegacyDashboard />
 }
 ```
 
