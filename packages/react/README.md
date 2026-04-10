@@ -40,6 +40,7 @@
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Provider](#provider)
+- [User context & targeting](#user-context--targeting)
 - [Hooks](#hooks)
   - [`useFlag`](#useflagflagkey-string-boolean)
   - [`useVariant`](#usevariantflagkey-string-string--undefined)
@@ -152,6 +153,89 @@ The provider exposes the following context:
 |----------|------|-------------|
 | `client` | `Flagify \| null` | The underlying Flagify client instance |
 | `isReady` | `boolean` | `true` once the client has been initialized |
+
+## User context & targeting
+
+Targeting rules let a flag return different values per user — for example, an `admin-tools` flag that's only `true` for users whose `role === 'admin'`, or a `beta-features` flag enabled for `plan === 'enterprise'`. **The targeting rules themselves are configured server-side** in the Flagify dashboard or API. The React SDK only forwards the user attributes.
+
+The pattern is one-shot, **not** per-flag:
+
+1. After the user is loaded by your auth layer, mount `<FlagifyProvider>` with `options.user`.
+2. The Provider's underlying client fetches all flag values **already evaluated against the targeting rules for that user** and stores them in its local cache.
+3. `useFlag('admin-tools')` reads the cached, already-targeted value and re-renders when it changes via SSE.
+
+There is no second hook, no `useFlag(key, user)` overload, and no need to call `client.evaluate()` from a component. **Do not** wrap `useFlag` in a custom hook that calls `client.evaluate(key, user)` per flag — it bypasses the cache, is async, and produces a flash of the wrong value.
+
+```tsx
+import { FlagifyProvider, useFlag } from '@flagify/react'
+import { useCurrentUser } from './auth'
+
+function Root() {
+  const user = useCurrentUser() // your app's auth state
+
+  return (
+    <FlagifyProvider
+      // key forces a fresh client + resync when the user changes (login/logout)
+      key={user?.id ?? 'anonymous'}
+      projectKey="proj_xxx"
+      publicKey="pk_xxx"
+      options={{
+        realtime: true,
+        user: user
+          ? { id: user.id, role: user.role, email: user.email }
+          : undefined,
+      }}
+    >
+      <App />
+    </FlagifyProvider>
+  )
+}
+
+function AdminMenu() {
+  // Already evaluated against targeting rules for the current user.
+  // Returns true only when the server-side rules say so for this user.
+  const canSeeAdmin = useFlag('admin-tools')
+  if (!canSeeAdmin) return null
+  return <Admin />
+}
+```
+
+### Where to mount the Provider
+
+`<FlagifyProvider>` must be **below** the provider that loads your user, so the user is available when the Flagify client initializes. If the Provider mounts before the user is known, the cache will be populated as anonymous and `useFlag` will return the anonymous evaluations until the cache resyncs.
+
+```tsx
+<AuthProvider>
+  <FlagifyProviderWithUser>  {/* reads user from auth, then mounts <FlagifyProvider> with key={user.id} */}
+    <ReactQueryProvider>
+      <Router>
+        {/* the rest of your app */}
+      </Router>
+    </ReactQueryProvider>
+  </FlagifyProviderWithUser>
+</AuthProvider>
+```
+
+### User object shape
+
+```typescript
+{
+  id: string                   // required — the user identifier (NOT "userId")
+  email?: string
+  role?: string
+  group?: string
+  geolocation?: { country?: string; region?: string; city?: string }
+  [key: string]: unknown       // any custom attribute (plan, companySize, betaCohort, etc.)
+}
+```
+
+The field is `id`, not `userId`. The SDK serializes it to `userId` on the wire automatically.
+
+### When the user changes
+
+The Provider re-syncs flags when `options.user.id` changes. The simplest way to make this fully reliable across all user attributes (and to invalidate any other client state tied to the previous identity) is to remount the Provider with `key={user.id ?? 'anonymous'}`. Switching from `'anonymous'` to a real id, or between two real ids, will tear down the old client and create a fresh one with the new user, refetching evaluated flags.
+
+For server-side per-request evaluation (e.g. inside Next.js API routes or Express handlers), use `flagify.evaluate(key, user)` from `@flagify/node` directly — see the [`@flagify/node` README](https://github.com/flagifyhq/javascript/tree/main/packages/node#flagifyevaluateflagkey-string-user-flagifyuser-promiseevaluateresult).
 
 ## Hooks
 
