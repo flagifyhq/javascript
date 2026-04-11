@@ -26,7 +26,13 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "@types/react": ">=18.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@flagify/node": "workspace:*"
@@ -34,7 +40,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^14",
-    "@types/react": "^18.2.0",
+    "@types/react": "^18.3.0",
     "jsdom": "^29.0.1",
     "react": "^18.2.0",
     "react-dom": "18"
