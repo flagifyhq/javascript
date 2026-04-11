@@ -131,6 +131,9 @@ const flagify = new Flagify({
 | `options.staleTimeMs` | `number` | No | `300000` | Cache staleness threshold in ms |
 | `options.realtime` | `boolean` | No | `false` | Enable real-time SSE updates |
 | `options.pollIntervalMs` | `number` | No | -- | Polling interval in ms for periodic flag sync |
+| `options.sseIdleTimeoutMs` | `number` | No | `45000` | Silence watchdog for the realtime stream. If no bytes (including heartbeat comments) arrive within this window, the client aborts and reconnects. Must exceed the server heartbeat interval. |
+| `options.sseReconnectBaseMs` | `number` | No | `1000` | Base delay for the SSE reconnection backoff. Actual delay is jittered to 50–100% of the exponential value and honors the server's `retry:` field as a floor. |
+| `options.sseReconnectMaxMs` | `number` | No | `30000` | Maximum delay for the SSE reconnection backoff. |
 | `options.user` | `FlagifyUser` | No | -- | User context for targeting |
 
 ## User context & targeting

@@ -2,6 +2,38 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
+## [v1.2.0](https://github.com/flagifyhq/javascript/releases/tag/v1.2.0) — 2026-04-11
+
+### Features
+
+- **`@flagify/react`** — new `<FlagifyAuthProvider>` wrapper component (#29). Thin wrapper around `<FlagifyProvider>` that takes a `useUserHook` prop so the wrapper can sit **below** another React provider (React Query, Zustand, Redux, any context-based auth layer) without the chicken-and-egg ordering trap. The wrapper calls your hook on every render, forwards the returned user to `options.user`, and computes a stable remount key from the full user object — so impersonation, in-session role/plan upgrades, and custom-attribute changes all force a clean resync, not just `user.id` changes. Pass a custom `userKey` prop to narrow the fingerprint (e.g. id-only) for cheaper re-evaluation. Closes frictions 2.1, 2.3, and 2.5 from `USAGE_PROD_FEEDBACK.md`.
+- **`@flagify/node`** — SSE realtime listener gains a silence watchdog and configurable reconnect backoff (#30). Three new optional fields on `FlagifyOptions.options`:
+  - `sseIdleTimeoutMs` (default `45000`) — if no bytes arrive in this window, abort and reconnect. Catches zombie TCP connections where the socket stays open but no data flows. Must exceed the server heartbeat interval.
+  - `sseReconnectBaseMs` (default `1000`) — base delay for the exponential backoff.
+  - `sseReconnectMaxMs` (default `30000`) — cap for the exponential backoff.
+
+  Backoff is now jittered to 50–100% of the exponential value to avoid thundering-herd reconnects when a fleet of clients reconnects simultaneously. The server's SSE `retry:` field acts as a floor when present and is cleared on every successful reconnect (pragmatic deviation from strict WHATWG SSE semantics — a one-shot `retry:` will not pin the backoff forever).
+
+### Behavior Change (read carefully before upgrading)
+
+- **SSE reconnection is now watchdog-driven for every `@flagify/node` client with `options.realtime: true`.** Existing code that does not set the new `sseIdleTimeoutMs` / `sseReconnectBaseMs` / `sseReconnectMaxMs` options gets the new behavior automatically — the 45-second idle timeout and jittered reconnect backoff replace the previous pure exponential with no silence detection. This is a strict improvement for long-running processes on flaky networks (connections that would previously go zombie are now recovered), but the timing of reconnects changes: retries happen sooner after a silent drop and are jittered to avoid thundering-herd bursts. If your infra has alerting keyed on deterministic reconnect timing, audit before upgrading. The `onInitialSync` handler continues to call `evaluateWithUser()` on every reconnect — per-user evaluated flag values remain correct after the new watchdog-triggered reconnects.
+- **No API changes.** `isEnabled`, `getValue`, `getVariant`, `evaluate`, `ready`, `destroy`, and the existing React hooks all have identical signatures. `<FlagifyAuthProvider>` is a new additive component — existing `<FlagifyProvider>` usage continues to work unchanged.
+
+### Improvements
+
+- **`@flagify/node`** — `RealtimeListener` gains a `destroyed` flag that prevents resurrect-after-destroy race conditions. Previously, a queued watchdog callback could schedule a new reconnect timer after `client.destroy()` returned, leaking timers and resurrecting a supposedly-dead listener. The `isStreaming` state transition is now owned by a single `finally` block in `stream()` instead of scattered across happy/catch/aborted paths. The reader loop checks `destroyed` at the top of every iteration so frame dispatch stops immediately on destroy, not after the current chunk's frames finish processing.
+- **`@flagify/react`** — exports `FlagifyAuthProviderProps` type for consumers that want to wrap or extend the new auth provider.
+
+### Documentation
+
+- `@flagify/react` README gains **"Common provider tree patterns"** (four scenarios: plain auth, React Query, Zustand/Redux selector, sibling-provider Gate leaf) and **"Why `useFlag` has no user argument"** FAQ sections.
+- `@flagify/node` README documents the three new SSE options in the configuration table.
+- Website SDK docs at `apps/website/src/content/docs/v1/sdk/react.mdx` mirror the React README changes.
+
+### Repository hygiene
+
+- **`javascript`** — `CLAUDE.md` and `TestAudit.MD` are no longer tracked (#31). These are local AI assistant instructions and internal test-audit notes — useful to developers working on the repo but noise for end users installing `@flagify/node` or `@flagify/react`. Contributors using Claude Code (or similar) should restore their local copies from git history after pulling this release.
+
 ## [v1.1.0](https://github.com/flagifyhq/javascript/releases/tag/v1.1.0) — 2026-04-10
 
 ### Bug Fixes
