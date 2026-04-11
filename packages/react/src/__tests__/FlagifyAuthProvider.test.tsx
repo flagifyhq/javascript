@@ -44,6 +44,7 @@ function renderWith(
   useUserHook: () => FlagifyUser | null | undefined,
   extraProps: {
     userKey?: (user: FlagifyUser | null | undefined) => string;
+    options?: Record<string, unknown>;
   } = {},
 ) {
   return render(
@@ -243,5 +244,59 @@ describe("FlagifyAuthProvider", () => {
 
     expect(constructorSpy).toHaveBeenCalledTimes(1);
     expect(destroySpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("does NOT remount when user attributes are re-ordered (stable hash)", async () => {
+    // Same logical user, different insertion order — a naive
+    // JSON.stringify would produce different strings and force a
+    // spurious remount. The default userKey sorts top-level keys so
+    // this round-trips.
+    let currentUser: FlagifyUser = { id: "u1", role: "admin", email: "a@b.com" };
+    const useUserHook = () => currentUser;
+
+    const { rerender } = renderWith(useUserHook);
+    await act(async () => {});
+    expect(constructorSpy).toHaveBeenCalledTimes(1);
+
+    currentUser = { email: "a@b.com", id: "u1", role: "admin" };
+    await act(async () => {
+      rerender(
+        <FlagifyAuthProvider
+          projectKey="proj"
+          publicKey="pk_test_123"
+          useUserHook={useUserHook}
+        >
+          <span>ok</span>
+        </FlagifyAuthProvider>,
+      );
+    });
+
+    expect(constructorSpy).toHaveBeenCalledTimes(1);
+    expect(destroySpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("does not crash when the user contains a non-JSON value (BigInt)", async () => {
+    // Custom attributes can be anything — including BigInt, which
+    // throws in JSON.stringify. The default userKey catches that
+    // and falls back to user.id so the provider tree still renders.
+    const useUserHook = () =>
+      ({ id: "u1", role: "admin", accountBalance: 10n } as unknown as FlagifyUser);
+
+    expect(() => renderWith(useUserHook)).not.toThrow();
+    expect(constructorSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards options.realtime and options.apiUrl to the client", async () => {
+    await act(async () => {
+      renderWith(() => ({ id: "u1" }), {
+        options: { realtime: true, apiUrl: "https://api.test.example" },
+      });
+    });
+    expect(constructorSpy).toHaveBeenCalledTimes(1);
+    const config = constructorSpy.mock.calls[0][0] as {
+      options?: { realtime?: boolean; apiUrl?: string };
+    };
+    expect(config.options?.realtime).toBe(true);
+    expect(config.options?.apiUrl).toBe("https://api.test.example");
   });
 });

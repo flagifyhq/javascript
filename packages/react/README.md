@@ -194,7 +194,7 @@ The wrapper:
 
 1. Calls `useUserHook()` on every render, so it composes with any hook-based source of truth.
 2. Forwards the returned user to `<FlagifyProvider>` via `options.user`.
-3. Computes a `key` from the current user (default: `JSON.stringify(user)`) and passes it to `<FlagifyProvider>` so any attribute change — login, logout, impersonation, in-session role or plan upgrade — forces a clean resync. The whole-object default catches cases that a plain `user.id` key would miss.
+3. Computes a `key` from the current user and passes it to `<FlagifyProvider>` so any attribute change — login, logout, impersonation, in-session role or plan upgrade — forces a clean resync. The default strategy hashes the user object with sorted top-level keys for authenticated users (spurious-remount-safe under re-ordered field construction) and returns the literal `'anonymous'` when the hook returns `null`/`undefined`, so both directions of the anonymous ↔ authenticated transition remount cleanly.
 
 Return `null` or `undefined` from `useUserHook` for anonymous visitors — the wrapper forwards `undefined` and keys by `'anonymous'`.
 
@@ -203,10 +203,10 @@ Return `null` or `undefined` from `useUserHook` for anonymous visitors — the w
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
 | `useUserHook` | `() => FlagifyUser \| null \| undefined` | Yes | React hook called on every render; returns the current user or nullish for anonymous |
-| `userKey` | `(user) => string` | No | Override the remount fingerprint. Defaults to `JSON.stringify(user)` (or `'anonymous'`) so any attribute change forces a resync. Supply a narrower function — e.g. `(u) => u?.id ?? 'anonymous'` — if you want to resync only on id changes. |
+| `userKey` | `(user: FlagifyUser \| null \| undefined) => string` | No | Override the remount key builder. Defaults to a stable (sorted-key) hash of the user object for authenticated users, or `'anonymous'` when the hook returns `null`/`undefined`. Supply a narrower function — e.g. `(u) => u?.id ?? 'anonymous'` — if you want to resync only on id changes. Your override receives `null`/`undefined` for anonymous — handle it explicitly. |
 | `projectKey` | `string` | Yes | Project identifier |
 | `publicKey` | `string` | Yes | Client-safe publishable API key |
-| `secretKey` | `string` | No | Server-side secret key |
+| `secretKey` | `string` | No | Secret API key (**server-side only** — never pass to `<FlagifyAuthProvider>` in a browser build) |
 | `options` | `object` | No | Client options (`apiUrl`, `realtime`, `staleTimeMs`, `pollIntervalMs`, …) except `user`, which the wrapper owns |
 | `children` | `ReactNode` | Yes | Your application tree |
 
@@ -575,7 +575,6 @@ function ThemeProvider({ children }: { children: ReactNode }) {
 | `useFlagifyClient` | Hook | Direct client access |
 | `FlagifyProviderProps` | Type | Props for `FlagifyProvider` |
 | `FlagifyAuthProviderProps` | Type | Props for `FlagifyAuthProvider` |
-| `FlagifyProviderChildren` | Type | Children type accepted by `FlagifyProvider` — useful for wrapper components that need to type their own `children` prop without `ComponentProps` gymnastics |
 | `FlagifyContextValue` | Type | Shape of the context value |
 
 Types re-exported from `@flagify/node`:

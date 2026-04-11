@@ -5,7 +5,6 @@
 export * from './FlagifyAuthProvider'
 export * from './FlagifyProvider'
 export * from './context'
-export * from './types'
 export * from './useFlag'
 export * from './useFlagValue'
 export * from './useFlagifyClient'
