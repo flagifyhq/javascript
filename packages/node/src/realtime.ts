@@ -125,7 +125,9 @@ export class RealtimeListener {
         if (this.controller) {
           this.controller.abort();
         }
-        this.isStreaming = false;
+        // isStreaming is owned by stream()'s finally block — the abort
+        // above propagates to reader.read(), the catch runs, finally
+        // resets the flag. No inline write here.
         this.scheduleReconnect();
       }
     }, WATCHDOG_CHECK_INTERVAL_MS);
@@ -162,10 +164,13 @@ export class RealtimeListener {
         throw new Error("SSE response has no body");
       }
 
-      // Successful connection → reset backoff and clear any stale
-      // server-suggested retry floor from the previous cycle. The EventSource
-      // spec treats `retry:` as the reconnection time *until the next
-      // update*, so once we're healthy again we start from scratch.
+      // Successful connection → reset backoff and drop any stale
+      // server-suggested retry floor. Pragmatic choice: we re-learn
+      // the server's backpressure each stream. Servers that want to
+      // enforce a longer delay should re-send `retry:` on the new
+      // stream — this deviates from the strict WHATWG SSE semantics
+      // (where `retry:` persists until updated) in exchange for not
+      // having a one-shot `retry: 60000` pin the backoff forever.
       this.reconnectAttempts = 0;
       this.serverRetryMs = null;
       this.lastActivityAt = Date.now();
@@ -174,6 +179,7 @@ export class RealtimeListener {
       let buffer = "";
 
       while (true) {
+        if (this.destroyed) break;
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -186,6 +192,7 @@ export class RealtimeListener {
         buffer = parts.pop() ?? "";
 
         for (const part of parts) {
+          if (this.destroyed) break;
           this.parseSSEFrame(part);
         }
       }
