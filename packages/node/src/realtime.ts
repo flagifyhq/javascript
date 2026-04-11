@@ -8,14 +8,25 @@ export interface RealtimeEvents {
   onError: (error: Error) => void;
 }
 
+export interface RealtimeOptions {
+  /** Watchdog timeout: if no bytes received for this long, force a reconnect. */
+  idleTimeoutMs?: number;
+  /** Base backoff delay in ms. */
+  reconnectBaseMs?: number;
+  /** Max backoff delay in ms. */
+  reconnectMaxMs?: number;
+}
+
 export interface FlagChangeEvent {
   environmentId: string;
   flagKey: string;
   action: "updated" | "created" | "archived";
 }
 
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 30000;
+const DEFAULT_IDLE_TIMEOUT_MS = 45_000;
+const DEFAULT_RECONNECT_BASE_MS = 1_000;
+const DEFAULT_RECONNECT_MAX_MS = 30_000;
+const WATCHDOG_CHECK_INTERVAL_MS = 10_000;
 
 /** Status codes that will never succeed on retry with the same credentials. */
 const NON_RETRYABLE_CODES = new Set([401, 403]);
@@ -24,41 +35,110 @@ export class RealtimeListener {
   private controller: AbortController | null = null;
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   private hasConnectedBefore = false;
   private permanentFailure = false;
+  private serverRetryMs: number | null = null;
+  private lastActivityAt = 0;
+  private isStreaming = false;
+
+  private readonly idleTimeoutMs: number;
+  private readonly reconnectBaseMs: number;
+  private readonly reconnectMaxMs: number;
 
   constructor(
     private readonly httpClient: FlagifyHttpClient,
     private readonly events: RealtimeEvents,
-  ) {}
+    options: RealtimeOptions = {},
+  ) {
+    this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+    this.reconnectBaseMs = options.reconnectBaseMs ?? DEFAULT_RECONNECT_BASE_MS;
+    this.reconnectMaxMs = options.reconnectMaxMs ?? DEFAULT_RECONNECT_MAX_MS;
+  }
 
   connect(): void {
     if (this.permanentFailure) return;
-    this.disconnect();
+
+    // Debounce: if a healthy stream is already running, ignore duplicate connects.
+    if (this.controller && this.isStreaming) {
+      console.warn(
+        "[Flagify] connect() called while a stream is already active — ignoring.",
+      );
+      return;
+    }
+
+    this.teardown();
     this.controller = new AbortController();
+    this.startWatchdog();
     this.stream(this.controller.signal);
   }
 
+  /**
+   * Disconnects permanently and resets all reconnection state.
+   * Call this from `client.destroy()`.
+   */
   disconnect(): void {
+    this.teardown();
+    this.reconnectAttempts = 0;
+    this.hasConnectedBefore = false;
+    this.serverRetryMs = null;
+  }
+
+  /**
+   * Tears down the current stream (controller + timers) without resetting
+   * reconnection state. Used between automatic reconnection attempts.
+   */
+  private teardown(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
     }
     if (this.controller) {
       this.controller.abort();
       this.controller = null;
     }
-    this.reconnectAttempts = 0;
-    this.hasConnectedBefore = false;
+    this.isStreaming = false;
+  }
+
+  /**
+   * Starts a silence watchdog. If no bytes (not even heartbeat comments)
+   * arrive within `idleTimeoutMs`, the current stream is aborted and a
+   * reconnect is scheduled. Protects against zombie TCP connections where
+   * the socket stays open but no data flows.
+   */
+  private startWatchdog(): void {
+    this.lastActivityAt = Date.now();
+    this.watchdogTimer = setInterval(() => {
+      if (Date.now() - this.lastActivityAt > this.idleTimeoutMs) {
+        console.warn(
+          `[Flagify] SSE idle for >${this.idleTimeoutMs}ms — forcing reconnect.`,
+        );
+        if (this.controller) {
+          this.controller.abort();
+        }
+        this.isStreaming = false;
+        this.scheduleReconnect();
+      }
+    }, WATCHDOG_CHECK_INTERVAL_MS);
   }
 
   private async stream(signal: AbortSignal): Promise<void> {
     try {
+      this.isStreaming = true;
       const res = await fetch(
         `${this.httpClient.baseUrl}/v1/eval/flags/stream`,
         {
           method: "GET",
-          headers: this.httpClient.headers,
+          headers: {
+            ...this.httpClient.headers,
+            Accept: "text/event-stream",
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
           signal,
         },
       );
@@ -78,6 +158,7 @@ export class RealtimeListener {
       }
 
       this.reconnectAttempts = 0;
+      this.lastActivityAt = Date.now();
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -85,6 +166,9 @@ export class RealtimeListener {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
+        // Any incoming bytes (including heartbeat comments) count as proof of life.
+        this.lastActivityAt = Date.now();
 
         buffer += decoder.decode(value, { stream: true });
 
@@ -98,9 +182,11 @@ export class RealtimeListener {
 
       // Stream ended normally — reconnect
       if (!signal.aborted) {
+        this.isStreaming = false;
         this.scheduleReconnect();
       }
     } catch (err) {
+      this.isStreaming = false;
       if (signal.aborted) return;
 
       const error = err instanceof Error ? err : new Error(String(err));
@@ -128,6 +214,13 @@ export class RealtimeListener {
         dataLines.push(line.slice(6));
       } else if (line.startsWith("data:")) {
         dataLines.push(line.slice(5));
+      } else if (line.startsWith("retry:")) {
+        // SSE `retry:` field — server-suggested reconnection delay in ms.
+        const raw = line.startsWith("retry: ") ? line.slice(7) : line.slice(6);
+        const ms = Number.parseInt(raw.trim(), 10);
+        if (Number.isFinite(ms) && ms >= 0) {
+          this.serverRetryMs = ms;
+        }
       }
       // Ignore comment lines (heartbeat `: heartbeat`)
     }
@@ -165,11 +258,28 @@ export class RealtimeListener {
   }
 
   private scheduleReconnect(): void {
-    const delay = Math.min(
-      RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts),
-      RECONNECT_MAX_MS,
+    // Stop the current watchdog — a new one starts on the next connect().
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+    // Don't double-schedule if a reconnect is already pending.
+    if (this.reconnectTimer) return;
+
+    const exponential = Math.min(
+      this.reconnectBaseMs * Math.pow(2, this.reconnectAttempts),
+      this.reconnectMaxMs,
     );
+    // Jitter to 50%-100% of the exponential value to avoid thundering herd
+    // when a fleet of clients reconnects simultaneously.
+    const jittered = exponential * (0.5 + Math.random() * 0.5);
+    // Honor the server-suggested retry delay as a floor when present.
+    const delay = Math.max(jittered, this.serverRetryMs ?? 0);
+
     this.reconnectAttempts++;
-    this.reconnectTimer = setTimeout(() => this.connect(), delay);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
   }
 }

@@ -299,36 +299,46 @@ export class Flagify implements IFlagifyClient {
   }
 
   private setupRealtimeListener() {
-    this.realtime = new RealtimeListener(this.httpClient, {
-      onConnected: () => {
-        console.info("[Flagify] Realtime connected");
-      },
-      onReconnected: () => {
-        console.info("[Flagify] Realtime reconnected");
-      },
-      onInitialSync: (flags) => {
-        for (const raw of flags) {
-          const flag = raw as FlagifyFlag;
-          this.flagCache.set(flag.key, {
-            flag,
-            lastFetchedAt: Date.now(),
-          });
-        }
-        console.info(`[Flagify] Synced ${flags.length} flags via SSE`);
+    this.realtime = new RealtimeListener(
+      this.httpClient,
+      {
+        onConnected: () => {
+          console.info("[Flagify] Realtime connected");
+        },
+        onReconnected: () => {
+          console.info("[Flagify] Realtime reconnected");
+        },
+        onInitialSync: (flags) => {
+          for (const raw of flags) {
+            const flag = raw as FlagifyFlag;
+            this.flagCache.set(flag.key, {
+              flag,
+              lastFetchedAt: Date.now(),
+            });
+          }
+          console.info(`[Flagify] Synced ${flags.length} flags via SSE`);
 
-        // Always run the engine — see note in syncFlags().
-        this.evaluateWithUser(this.config.options?.user).catch((err) => {
-          console.warn("[Flagify] Failed to evaluate flags after initial sync:", err);
-        });
+          // We intentionally do NOT call evaluateWithUser() here.
+          // The constructor's syncFlags() already populated evaluated values
+          // for the current user, and individual flag_change events trigger
+          // refetchFlag() which re-runs the targeting engine per flag.
+          // Calling evaluateWithUser() on every reconnect inflates the
+          // server-side evaluation counter with no added correctness.
+        },
+        onFlagChange: (event) => {
+          console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
+          this.refetchFlag(event.flagKey);
+        },
+        onError: (error) => {
+          console.warn("[Flagify] Realtime error (will reconnect):", error.message);
+        },
       },
-      onFlagChange: (event) => {
-        console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
-        this.refetchFlag(event.flagKey);
+      {
+        idleTimeoutMs: this.config.options?.sseIdleTimeoutMs,
+        reconnectBaseMs: this.config.options?.sseReconnectBaseMs,
+        reconnectMaxMs: this.config.options?.sseReconnectMaxMs,
       },
-      onError: (error) => {
-        console.warn("[Flagify] Realtime error (will reconnect):", error.message);
-      },
-    });
+    );
 
     this.realtime.connect();
   }
