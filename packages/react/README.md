@@ -40,7 +40,11 @@
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Provider](#provider)
+  - [`<FlagifyProvider>`](#flagifyprovider)
+  - [`<FlagifyAuthProvider>`](#flagifyauthprovider)
 - [User context & targeting](#user-context--targeting)
+  - [Common provider tree patterns](#common-provider-tree-patterns)
+  - [Why `useFlag` has no user argument](#why-useflag-has-no-user-argument)
 - [Hooks](#hooks)
   - [`useFlag`](#useflagflagkey-string-boolean--undefined)
   - [`useVariant`](#usevariantflagkey-string-string--undefined)
@@ -155,6 +159,57 @@ The provider exposes the following context:
 | `client` | `Flagify \| null` | The underlying Flagify client instance |
 | `isReady` | `boolean` | `true` once the client has been initialized |
 
+### `<FlagifyAuthProvider>`
+
+A thin wrapper around `<FlagifyProvider>` for the common case where your user lives in **another** React provider further up the tree — React Query, Zustand, Redux, or any context-based auth layer. Instead of manually wiring `options.user` and `key=` on every render, pass a `useUserHook` prop and the wrapper reads the user from your source-of-truth on each render and forwards it.
+
+Use `<FlagifyAuthProvider>` when `<FlagifyProvider>` needs to sit **below** another provider (e.g. `ReactQueryProvider`) that owns the user. Use `<FlagifyProvider>` directly when you already have the user synchronously (static, localStorage, Zustand selector).
+
+```tsx
+import { FlagifyAuthProvider } from '@flagify/react'
+import { useUserProfileService } from './auth'
+
+function Root() {
+  return (
+    <ReactQueryProvider>
+      <FlagifyAuthProvider
+        projectKey="proj_xxx"
+        publicKey="pk_xxx"
+        useUserHook={() => {
+          const { data } = useUserProfileService()
+          return data
+            ? { id: data.id, role: data.role, email: data.email }
+            : null
+        }}
+        options={{ realtime: true }}
+      >
+        <App />
+      </FlagifyAuthProvider>
+    </ReactQueryProvider>
+  )
+}
+```
+
+The wrapper:
+
+1. Calls `useUserHook()` on every render, so it composes with any hook-based source of truth.
+2. Forwards the returned user to `<FlagifyProvider>` via `options.user`.
+3. Computes a `key` from the current user (default: `JSON.stringify(user)`) and passes it to `<FlagifyProvider>` so any attribute change — login, logout, impersonation, in-session role or plan upgrade — forces a clean resync. The whole-object default catches cases that a plain `user.id` key would miss.
+
+Return `null` or `undefined` from `useUserHook` for anonymous visitors — the wrapper forwards `undefined` and keys by `'anonymous'`.
+
+#### Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `useUserHook` | `() => FlagifyUser \| null \| undefined` | Yes | React hook called on every render; returns the current user or nullish for anonymous |
+| `userKey` | `(user) => string` | No | Override the remount fingerprint. Defaults to `JSON.stringify(user)` (or `'anonymous'`) so any attribute change forces a resync. Supply a narrower function — e.g. `(u) => u?.id ?? 'anonymous'` — if you want to resync only on id changes. |
+| `projectKey` | `string` | Yes | Project identifier |
+| `publicKey` | `string` | Yes | Client-safe publishable API key |
+| `secretKey` | `string` | No | Server-side secret key |
+| `options` | `object` | No | Client options (`apiUrl`, `realtime`, `staleTimeMs`, `pollIntervalMs`, …) except `user`, which the wrapper owns |
+| `children` | `ReactNode` | Yes | Your application tree |
+
 ## User context & targeting
 
 Targeting rules let a flag return different values per user — for example, an `admin-tools` flag that's only `true` for users whose `role === 'admin'`, or a `beta-features` flag enabled for `plan === 'enterprise'`. **The targeting rules themselves are configured server-side** in the Flagify dashboard or API. The React SDK only forwards the user attributes.
@@ -267,6 +322,86 @@ The field is `id`, not `userId`. The SDK serializes it to `userId` on the wire a
 The Provider re-syncs flags when `options.user.id` changes. The simplest way to make this fully reliable across all user attributes (and to invalidate any other client state tied to the previous identity) is to remount the Provider with `key={user.id ?? 'anonymous'}`. Switching from `'anonymous'` to a real id, or between two real ids, will tear down the old client and create a fresh one with the new user, refetching evaluated flags.
 
 For server-side per-request evaluation (e.g. inside Next.js API routes or Express handlers), use `flagify.evaluate(key, user)` from `@flagify/node` directly — see the [`@flagify/node` README](https://github.com/flagifyhq/javascript/tree/main/packages/node#flagifyevaluateflagkey-string-user-flagifyuser-promiseevaluateresult).
+
+### Common provider tree patterns
+
+Real apps rarely have a simple `<Auth><Flagify><App /></Flagify></Auth>` tree. Here are the four patterns we've seen and the provider that fits each one.
+
+**1. Plain auth (user synchronously available).** The user comes from `localStorage`, a server-rendered cookie, or any source that resolves before React mounts. Use `<FlagifyProvider>` directly.
+
+```tsx
+const user = readUserFromCookie() // sync, no hooks involved
+
+<FlagifyProvider
+  projectKey="proj_xxx"
+  publicKey="pk_xxx"
+  options={{ user }}
+>
+  <App />
+</FlagifyProvider>
+```
+
+**2. Auth via React Query.** The user is fetched asynchronously with `useQuery` or similar. `<FlagifyProvider>` needs to sit **below** `<ReactQueryProvider>` — use `<FlagifyAuthProvider>` so the hook call happens inside the React tree without violating the rules of hooks.
+
+```tsx
+<ReactQueryProvider>
+  <FlagifyAuthProvider
+    projectKey="proj_xxx"
+    publicKey="pk_xxx"
+    useUserHook={() => {
+      const { data } = useUserProfileService()
+      return data ? { id: data.id, role: data.role } : null
+    }}
+  >
+    <App />
+  </FlagifyAuthProvider>
+</ReactQueryProvider>
+```
+
+**3. Auth via Zustand / Redux selector.** The user lives in a synchronous store selector. Use `<FlagifyAuthProvider>` with the selector as the hook.
+
+```tsx
+<FlagifyAuthProvider
+  projectKey="proj_xxx"
+  publicKey="pk_xxx"
+  useUserHook={() => useAuthStore((s) => s.user)}
+>
+  <App />
+</FlagifyAuthProvider>
+```
+
+**4. A sibling provider needs a flag.** The trap: `<ReactQueryProvider>` (or `<ThemeProvider>`, `<I18nProvider>`, etc.) wants to gate its own setup on a flag — but `<FlagifyProvider>` is below it, so it can't use `useFlag` from its own scope. **Don't** invert the tree. Extract the flag consumer into a leaf component and mount it inside the Flagify tree.
+
+```tsx
+// Wrong: putting the useFlag call in ReactQueryProvider itself causes a
+// chicken-and-egg because FlagifyProvider needs the user from React Query.
+
+// Right: the gate is a leaf, and it lives inside FlagifyProvider.
+function ReactQueryDevtoolsGate() {
+  const showDevtools = useFlag('react-query-devtools')
+  if (showDevtools !== true) return null
+  return <ReactQueryDevtools />
+}
+
+<ReactQueryProvider>
+  <FlagifyAuthProvider useUserHook={useUserQueryHook} projectKey="…" publicKey="…">
+    <App />
+    <ReactQueryDevtoolsGate />
+  </FlagifyAuthProvider>
+</ReactQueryProvider>
+```
+
+### Why `useFlag` has no user argument
+
+A question that comes up on every integration: _why not just `useFlag('admin-tools', user)`?_ The answer is three constraints that make the synchronous, cache-first API possible:
+
+1. **It would make `useFlag` asynchronous.** Passing a new user per call would bypass the cache (or require per-user caches keyed on every render), meaning every call would suspend or return a loading state. You'd be back to `if (flag === undefined) return <Spinner />` on every feature gate.
+2. **It breaks the SSE streaming model.** The server streams flag changes to the single user the client was initialized with. An ad-hoc user that only appears in one render has no subscription, so you'd silently miss updates.
+3. **It fans out HTTP.** Each `useFlag(key, user)` with a new identity is a new evaluation request. Multiply by every flag × every component × every render and the request count explodes — defeating the local cache entirely.
+
+The correct pattern is to **pass `user` once** to `<FlagifyProvider>` (or let `<FlagifyAuthProvider>` do it) and let the SDK evaluate everything against that user locally. Hooks then read from the cache synchronously and re-render via SSE when flags change.
+
+For server-side code that legitimately needs per-request user context (e.g. Next.js API routes), use `flagify.evaluate(key, user)` from `@flagify/node` — it's the right tool in a different environment.
 
 ## Hooks
 
@@ -431,6 +566,7 @@ function ThemeProvider({ children }: { children: ReactNode }) {
 | Export | Type | Description |
 |--------|------|-------------|
 | `FlagifyProvider` | Component | Context provider -- wraps your app |
+| `FlagifyAuthProvider` | Component | Wrapper that reads the user from a `useUserHook` prop and forwards it to `FlagifyProvider` |
 | `FlagifyContext` | `React.Context` | Raw context (advanced usage) |
 | `useFlag` | Hook | Boolean flag evaluation |
 | `useVariant` | Hook | String variant evaluation |
@@ -438,6 +574,8 @@ function ThemeProvider({ children }: { children: ReactNode }) {
 | `useIsReady` | Hook | Client readiness check |
 | `useFlagifyClient` | Hook | Direct client access |
 | `FlagifyProviderProps` | Type | Props for `FlagifyProvider` |
+| `FlagifyAuthProviderProps` | Type | Props for `FlagifyAuthProvider` |
+| `FlagifyProviderChildren` | Type | Children type accepted by `FlagifyProvider` — useful for wrapper components that need to type their own `children` prop without `ComponentProps` gymnastics |
 | `FlagifyContextValue` | Type | Shape of the context value |
 
 Types re-exported from `@flagify/node`:
