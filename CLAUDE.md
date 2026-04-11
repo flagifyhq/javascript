@@ -2,6 +2,21 @@
 
 Instructions for AI assistants and contributors working on the Flagify JavaScript SDKs.
 
+## Knowledge Graph (RAG index)
+
+A graphify knowledge graph covers the full monorepo (API + CLI + SDKs + website). **Check it first for structural or cross-file questions** — ~186× cheaper than reading source and reveals how `@flagify/node` / `@flagify/react` / `@flagify/nestjs` / `@flagify/astro` tie into the Go API and the website docs.
+
+**Location:** `../graphify-out/` — `graph.json` (1,671 nodes / 2,337 edges / 89 communities), `GRAPH_REPORT.md`, `graph.html`, `obsidian/` vault.
+
+**Use it for:**
+- `/graphify query "how does FlagifyProvider evaluate flags"` — ranked subgraph with `source_file:line`.
+- `/graphify path "FlagifyProvider" "evaluation/handler.go"` — shortest path across the SDK → API boundary.
+- `/graphify explain "RealtimeListener"` — plain-language summary of a node + its neighbors.
+
+After code changes: `/graphify --update` from the monorepo root (incremental; AST is free, only doc/image changes cost LLM tokens).
+
+Edges are tagged `EXTRACTED` / `INFERRED` / `AMBIGUOUS` — trust EXTRACTED, verify INFERRED against the referenced source location.
+
 ## Project overview
 
 Monorepo with npm packages for integrating Flagify feature flags into JavaScript/TypeScript apps.
