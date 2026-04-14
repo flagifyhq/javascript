@@ -143,8 +143,6 @@ export class RealtimeListener {
           headers: {
             ...this.httpClient.headers,
             Accept: "text/event-stream",
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
           },
           signal,
         },
