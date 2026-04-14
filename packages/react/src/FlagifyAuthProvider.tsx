@@ -42,7 +42,6 @@ export function FlagifyAuthProvider({
   children,
   projectKey,
   publicKey,
-  secretKey,
 }: FlagifyAuthProviderProps) {
   const user = useUserHook();
   return (
@@ -50,7 +49,6 @@ export function FlagifyAuthProvider({
       key={userKey(user)}
       projectKey={projectKey}
       publicKey={publicKey}
-      secretKey={secretKey}
       options={{ ...options, user: user ?? undefined }}
     >
       {children}

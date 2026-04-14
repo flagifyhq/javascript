@@ -2,11 +2,22 @@ import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { Flagify, type FlagifyOptions } from '@flagify/node'
 import { FlagifyContext } from './context'
 
-export interface FlagifyProviderProps extends FlagifyOptions {
+export interface FlagifyProviderProps extends Omit<FlagifyOptions, 'secretKey'> {
   children: ReactNode
 }
 
 export function FlagifyProvider({ children, ...config }: FlagifyProviderProps) {
+  if (typeof window !== 'undefined') {
+    const leaked = (config as FlagifyOptions).secretKey
+    if (leaked || config.publicKey?.startsWith('sk_')) {
+      console.error(
+        '[Flagify] A secret key (sk_*) was passed to <FlagifyProvider>. ' +
+          'Secret keys are server-only and must never be sent to the browser. ' +
+          'Use your public key (pk_*) instead.',
+      )
+    }
+  }
+
   const [client, setClient] = useState<Flagify | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [version, setVersion] = useState(0)
@@ -43,7 +54,7 @@ export function FlagifyProvider({ children, ...config }: FlagifyProviderProps) {
       unsubscribe()
       instance.destroy()
     }
-  }, [config.projectKey, config.publicKey, config.secretKey, config.options?.user?.id, config.options?.realtime, config.options?.pollIntervalMs, config.options?.apiUrl])
+  }, [config.projectKey, config.publicKey, config.options?.user?.id, config.options?.realtime, config.options?.pollIntervalMs, config.options?.apiUrl])
 
   return (
     <FlagifyContext.Provider value={{ client, isReady, version }}>
