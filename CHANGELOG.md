@@ -2,6 +2,25 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
+## [v1.3.0](https://github.com/flagifyhq/javascript/releases/tag/v1.3.0) — 2026-04-14
+
+### Bug Fixes
+
+- **`@flagify/node`** — SSE realtime connection now works in browsers ([#36](https://github.com/flagifyhq/javascript/pull/36)). The SDK was sending `Cache-Control: no-cache` and `Pragma: no-cache` on the `fetch()` to `/v1/eval/flags/stream`. Neither is a CORS-simple header, so browsers dispatched a preflight listing them, and the API's `PublicCORS` allowlist did not include them — the preflight failed, the browser blocked the connection, and `options.realtime: true` silently fell back to polling (or never streamed at all) in the browser. Both headers are redundant for SSE (`text/event-stream` is not cached by browsers), so they were removed from the request. Node-side clients were never affected because Node's `fetch` does not perform CORS checks. Reported by an external user integrating `@flagify/react` in Next.js.
+
+### Breaking Type Change (compile-time only, read carefully before upgrading)
+
+- **`@flagify/react`** — `FlagifyProviderProps` no longer exposes the `secretKey` field ([#37](https://github.com/flagifyhq/javascript/pull/37)). The React Provider's props type now extends `Omit<FlagifyOptions, 'secretKey'>` instead of the full `FlagifyOptions`. Secret keys (`sk_*`) are server-only and must never ship to a browser bundle; having the field in the Provider's public type invited developers to paste one in. **Who breaks:** TypeScript users who were passing `secretKey` to `<FlagifyProvider>` (or `<FlagifyAuthProvider>`) will get a compile error after upgrading. **What to do:** remove the `secretKey` prop — it was being ignored at runtime by any correctly configured browser bundle and its presence was actively dangerous. Plain JavaScript users and anyone using only `publicKey` are unaffected. Runtime behavior is unchanged for correct usage; if a `sk_*` key slips through via `as any` or a `publicKey="sk_..."` typo, the Provider now logs a hard `console.error` in the browser instead of silently forwarding the secret.
+
+### Improvements
+
+- **`@flagify/react`** — new runtime guard in `<FlagifyProvider>` that detects secret-key leakage to the browser. Triggers on either a `secretKey` passed via type-escape (`as any`) or a `publicKey` whose value starts with `sk_`. Logs a `console.error` with remediation guidance. The guard is a browser-only check (gated on `typeof window !== 'undefined'`) and does not affect SSR or Node consumers.
+
+### Documentation
+
+- `@flagify/react` README updated to stop listing `secretKey` as a Provider prop and to call out that secret keys belong in server SDKs only (`@flagify/node`, `@flagify/nestjs`, `@flagify/astro` middleware).
+- Website SDK docs at `apps/website/src/content/docs/v1/sdk/react.mdx` mirror the Provider prop change.
+
 ## [v1.2.0](https://github.com/flagifyhq/javascript/releases/tag/v1.2.0) — 2026-04-11
 
 ### Features

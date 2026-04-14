@@ -145,8 +145,7 @@ All props from [`FlagifyOptions`](https://github.com/flagifyhq/node-sdk#configur
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
 | `projectKey` | `string` | Yes | Project identifier from your Flagify workspace |
-| `publicKey` | `string` | Yes | Client-safe publishable API key |
-| `secretKey` | `string` | No | Server-side secret key |
+| `publicKey` | `string` | Yes | Client-safe publishable API key (`pk_*`). **Never pass a secret key (`sk_*`) here** — secret keys are server-only and belong in `@flagify/node`, `@flagify/nestjs`, or the `@flagify/astro` middleware. The Provider logs a `console.error` in the browser if it detects a secret-key leak. |
 | `options` | `object` | No | Additional configuration (apiUrl, staleTimeMs, user, realtime) |
 | `children` | `ReactNode` | Yes | Your application tree |
 
@@ -205,8 +204,7 @@ Return `null` or `undefined` from `useUserHook` for anonymous visitors — the w
 | `useUserHook` | `() => FlagifyUser \| null \| undefined` | Yes | React hook called on every render; returns the current user or nullish for anonymous |
 | `userKey` | `(user: FlagifyUser \| null \| undefined) => string` | No | Override the remount key builder. Defaults to a stable (sorted-key) hash of the user object for authenticated users, or `'anonymous'` when the hook returns `null`/`undefined`. Supply a narrower function — e.g. `(u) => u?.id ?? 'anonymous'` — if you want to resync only on id changes. Your override receives `null`/`undefined` for anonymous — handle it explicitly. |
 | `projectKey` | `string` | Yes | Project identifier |
-| `publicKey` | `string` | Yes | Client-safe publishable API key |
-| `secretKey` | `string` | No | Secret API key (**server-side only** — never pass to `<FlagifyAuthProvider>` in a browser build) |
+| `publicKey` | `string` | Yes | Client-safe publishable API key (`pk_*`). Secret keys (`sk_*`) are server-only and not accepted here — use `@flagify/node`, `@flagify/nestjs`, or the `@flagify/astro` middleware for server-side evaluation. |
 | `options` | `object` | No | Client options (`apiUrl`, `realtime`, `staleTimeMs`, `pollIntervalMs`, …) except `user`, which the wrapper owns |
 | `children` | `ReactNode` | Yes | Your application tree |
 
