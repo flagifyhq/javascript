@@ -3,7 +3,6 @@
  */
 
 export * from './client'
-export * from './debug'
 export * from './realtime'
 export * from './types/FlagifyClient'
 export * from './types/FlagifyFlag'

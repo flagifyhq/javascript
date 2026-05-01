@@ -1,12 +1,12 @@
 import { createHttpClient, FlagifyHttpClient, FlagifyAuthError } from "./api/httpClient";
-
-export { FlagifyAuthError };
 import { debugLog } from "./debug";
 import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
 import { FlagifyFlag } from "./types/FlagifyFlag";
 import { FlagifyOptions } from "./types/FlagifyTypes";
 import { FlagifyUser } from "./types/FlagifyUser";
+
+export { FlagifyAuthError };
 
 export interface EvaluateResult {
   key: string;

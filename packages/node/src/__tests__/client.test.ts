@@ -467,4 +467,64 @@ describe("Flagify client", () => {
       );
     });
   });
+
+  // The SDK is fail-closed by design: a failure to reach the server (no SSE,
+  // no HTTP) must NEVER promote a flag from its server-defined off state to on.
+  // These invariants protect that contract — they are intentionally redundant
+  // with isEnabled()/getValue() unit tests because the contract is critical.
+  describe("fail-closed invariants under network failure", () => {
+    it("isEnabled() returns false when no sync ever succeeded (cache empty)", async () => {
+      // Both initial sync and the eval POST reject — cache stays empty.
+      mockFetch.mockReset();
+      mockFetch.mockRejectedValue(new Error("network down"));
+      const client = createClient();
+      await client.ready(); // ready() resolves even if sync fails
+
+      expect(client.isEnabled("any-flag")).toBe(false);
+      expect(client.getValue("any-flag", "fallback-default")).toBe("fallback-default");
+    });
+
+    it("isEnabled() respects offValue=false when flag is disabled, even after a stream error", async () => {
+      // Server says: enabled=false, offValue=false, value=true. The SDK must
+      // return the offValue (false), not the raw value (true), regardless of
+      // any subsequent SSE/network failure.
+      mockFetchResponse([
+        makeFlag({ key: "kill-switch", enabled: false, offValue: false, value: true }),
+      ]);
+      const client = createClient();
+      await client.ready();
+
+      expect(client.isEnabled("kill-switch")).toBe(false);
+
+      // Simulate a downstream SSE/HTTP failure: any subsequent fetch fails.
+      // The cache MUST stay intact and the flag MUST stay false.
+      mockFetch.mockReset();
+      mockFetch.mockRejectedValue(new Error("SSE stream broken"));
+
+      expect(client.isEnabled("kill-switch")).toBe(false);
+    });
+
+    it("getValue() returns the developer's fallback (not flag.value) when nothing is cached", async () => {
+      mockFetch.mockReset();
+      mockFetch.mockRejectedValue(new Error("network down"));
+      const client = createClient();
+      await client.ready();
+
+      // The dev's intent (`false`) wins — there is no cached flag to override it.
+      expect(client.getValue<boolean>("missing-flag", false)).toBe(false);
+      expect(client.getValue<number>("missing-number", 0)).toBe(0);
+      expect(client.getValue<string>("missing-string", "")).toBe("");
+    });
+
+    it("isEnabled() preserves false for non-boolean cached flags (no type confusion)", async () => {
+      mockFetchResponse([
+        makeFlag({ key: "tier", type: "string", enabled: true, value: "pro" as unknown as boolean }),
+      ]);
+      const client = createClient();
+      await client.ready();
+
+      // A string-typed flag must NEVER read as enabled via isEnabled().
+      expect(client.isEnabled("tier")).toBe(false);
+    });
+  });
 });
