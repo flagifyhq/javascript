@@ -52,6 +52,7 @@
   - [`useIsReady`](#useisready-boolean)
   - [`useFlagifyClient`](#useflagifyclient-flagify)
 - [Examples](#examples)
+- [Debug logging](#debug-logging)
 - [API reference](#api-reference)
 - [Contributing](#contributing)
 - [License](#license)
@@ -558,6 +559,25 @@ function ThemeProvider({ children }: { children: ReactNode }) {
   return <div style={style}>{children}</div>
 }
 ```
+
+## Debug logging
+
+`@flagify/react` is silent in normal operation. To diagnose realtime/SSE issues, opt in with the `FLAGIFY_DEBUG` env var (Node, Next.js, Vite, or any bundler that inlines `process.env`):
+
+```bash
+FLAGIFY_DEBUG=1 next dev
+# or
+FLAGIFY_DEBUG=1 vite
+```
+
+For a browser-only build with no env-var inlining, set the flag in DevTools and reload:
+
+```js
+localStorage.setItem("FLAGIFY_DEBUG", "1");
+location.reload();
+```
+
+You'll see entries like `[Flagify] Realtime connected`, `[Flagify] Synced N flags via SSE`, and `[Flagify] Flag changed: <key>`. Real errors (missing `<FlagifyProvider>`, failed post-sync evaluation, duplicate connect) always log with no opt-in needed.
 
 ## API reference
 

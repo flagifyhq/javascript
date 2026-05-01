@@ -348,6 +348,26 @@ flagify.onFlagChange = (event) => {
 | Variable | Description |
 |----------|-------------|
 | `FLAGIFY_API_URL` | Override the default API base URL |
+| `FLAGIFY_DEBUG` | Set to `1` to enable verbose debug logs (SSE connect/reconnect/sync, flag-change notifications, idle-timeout warnings). Off by default — production consoles stay quiet. Errors that indicate a real problem (failed evaluation, duplicate connect, missing Provider) always log regardless. |
+
+## Debug logging
+
+`@flagify/node` is silent in normal operation. To diagnose connection issues, opt in with the `FLAGIFY_DEBUG` env var:
+
+```bash
+FLAGIFY_DEBUG=1 node app.js
+```
+
+You'll see entries like:
+
+```
+[Flagify] Realtime connected
+[Flagify] Synced 12 flags via SSE
+[Flagify] Flag changed: new-checkout (updated)
+[Flagify] Realtime reconnected
+```
+
+Real errors (failed post-sync evaluation, duplicate `connect()` calls, missing configuration) always log with no opt-in needed.
 
 ## Types
 

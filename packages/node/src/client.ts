@@ -1,6 +1,7 @@
 import { createHttpClient, FlagifyHttpClient, FlagifyAuthError } from "./api/httpClient";
 
 export { FlagifyAuthError };
+import { debugLog } from "./debug";
 import { RealtimeListener, FlagChangeEvent } from "./realtime";
 import { IFlagifyClient } from "./types/FlagifyClient";
 import { FlagifyFlag } from "./types/FlagifyFlag";
@@ -303,10 +304,10 @@ export class Flagify implements IFlagifyClient {
       this.httpClient,
       {
         onConnected: () => {
-          console.info("[Flagify] Realtime connected");
+          debugLog.info("[Flagify] Realtime connected");
         },
         onReconnected: () => {
-          console.info("[Flagify] Realtime reconnected");
+          debugLog.info("[Flagify] Realtime reconnected");
         },
         onInitialSync: (flags) => {
           for (const raw of flags) {
@@ -316,22 +317,24 @@ export class Flagify implements IFlagifyClient {
               lastFetchedAt: Date.now(),
             });
           }
-          console.info(`[Flagify] Synced ${flags.length} flags via SSE`);
+          debugLog.info(`[Flagify] Synced ${flags.length} flags via SSE`);
 
           // Always run the engine — see note in syncFlags(). This is the
           // reconnect path too: flag_change events emitted while the stream
           // was down are not replayed, so we must re-evaluate the full set
           // against the current user whenever initial_sync fires.
           this.evaluateWithUser(this.config.options?.user).catch((err) => {
+            // Always-on: a failed post-sync evaluation is a real error the
+            // dev needs to see — do not gate behind FLAGIFY_DEBUG.
             console.warn("[Flagify] Failed to evaluate flags after initial sync:", err);
           });
         },
         onFlagChange: (event) => {
-          console.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
+          debugLog.debug(`[Flagify] Flag changed: ${event.flagKey} (${event.action})`);
           this.refetchFlag(event.flagKey);
         },
         onError: (error) => {
-          console.warn("[Flagify] Realtime error (will reconnect):", error.message);
+          debugLog.warn("[Flagify] Realtime error (will reconnect):", error.message);
         },
       },
       {
