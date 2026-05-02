@@ -1,4 +1,5 @@
 import { FlagifyHttpClient, FlagifyAuthError } from "./api/httpClient";
+import { debugLog } from "./debug";
 
 export interface RealtimeEvents {
   onFlagChange: (event: FlagChangeEvent) => void;
@@ -119,7 +120,7 @@ export class RealtimeListener {
     this.watchdogTimer = setInterval(() => {
       if (this.destroyed) return;
       if (Date.now() - this.lastActivityAt > this.idleTimeoutMs) {
-        console.warn(
+        debugLog.warn(
           `[Flagify] SSE idle for >${this.idleTimeoutMs}ms — forcing reconnect.`,
         );
         if (this.controller) {
