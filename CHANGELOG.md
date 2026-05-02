@@ -2,6 +2,28 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
+## [v1.5.0](https://github.com/flagifyhq/javascript/releases/tag/v1.5.0) — 2026-05-02
+
+### Features
+
+- **`@flagify/node`** — new `verifyWebhookSignature(rawBody, header, secret, opts?)` and `constructWebhookEvent(rawBody, header, secret, opts?)` helpers for receivers of Flagify webhook deliveries. Both accept the raw bytes plus the `X-Flagify-Signature: t=<unix>,v1=<hex>` header; they validate the HMAC-SHA256 of `<unix>.<rawBody>` against the webhook secret you received at subscription create time, and (for `constructWebhookEvent`) parse the JSON into a typed `WebhookEvent`. Failures throw `WebhookSignatureError` with a machine-readable `code` (`MISSING_HEADER`, `MALFORMED_HEADER`, `TIMESTAMP_OUT_OF_TOLERANCE`, `SIGNATURE_MISMATCH`, `INVALID_PAYLOAD`). Replay-attack window defaults to `300s` (configurable via `tolerance`).
+- **`@flagify/nestjs`** — re-exports the helpers and adds `FlagifyWebhookGuard` for declarative use in controllers. The guard reads the raw body (`request.rawBody` by default; configurable via `rawBodyAccessor`), validates the header, and stores the parsed event on `request.flagifyEvent` for the handler. Supports both static `secret` and per-request `resolveSecret(req)` strategies for multi-webhook setups.
+- **`@flagify/astro`** — re-exports the helpers and adds `defineWebhookHandler({ secret, onEvent, verify? })`, an Astro `APIRoute` factory that returns 200/403/500 based on signature validity and handler outcome. Reads the body via `request.text()`, so works in any SSR adapter (Node, Vercel, Cloudflare Workers).
+- **8 supported event types** are exported as a discriminated union (`WebhookEventType`): `flag.created`, `flag.updated`, `flag.archived`, `flag.cloned`, `flag.toggled`, `flag.variants_set`, `flag.promoted`, `targeting.rules_set` — kept in lockstep with the API's `internal/domain/webhook/model.go::SupportedEvents()`.
+
+### Documentation
+
+- **`@flagify/node` README** — new "Verifying webhook signatures" section with an Express raw-body example and an enumeration of `WebhookSignatureError` codes.
+- **`@flagify/nestjs` README** — new section covering `FlagifyWebhookGuard` plus the `request.rawBody` setup that is required for signature verification (`express.json({ verify })`).
+- **`@flagify/astro` README** — new section showing `defineWebhookHandler` in an SSR API route.
+- **Website** docs — `concepts/webhooks.mdx` adds a "Verifying signatures in your code" block with examples for Node, NestJS, and Astro; the SDK pages link to the new sections (companion PR in `flagifyhq/apps`).
+
+### Notes
+
+- **Server-only.** `@flagify/react` does **not** ship signature helpers — webhooks are server-to-server. Browser code never receives them.
+- **Raw bytes required.** Frameworks that JSON-parse the body before your handler runs (Express's default `json()`, NestJS, …) mutate the bytes that the API signed over. Read the raw stream (e.g. `express.raw({ type: 'application/json' })` or `express.json({ verify: (req, _res, buf) => req.rawBody = buf })`) before calling the helpers.
+- **Idempotency.** Each delivery includes a stable `event.id` (ULID). Persist it on the receiver side and skip duplicates — the API may retry deliveries after transient failures.
+
 ## [v1.4.0](https://github.com/flagifyhq/javascript/releases/tag/v1.4.0) — 2026-05-02
 
 ### Features

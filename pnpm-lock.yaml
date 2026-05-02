@@ -30,6 +30,9 @@ importers:
         specifier: workspace:*
         version: link:../node
     devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.19.15
       astro:
         specifier: ^4.0.0
         version: 4.16.19(@types/node@22.19.15)(lightningcss@1.32.0)(rollup@4.60.0)(typescript@5.9.3)
