@@ -275,6 +275,16 @@ declare namespace App {
 |--------|------|-------------|
 | `createFlagifyAdapter` | Function | Creates a Vercel Flags SDK compatible adapter |
 
+## Debug logging (`FLAGIFY_DEBUG`)
+
+`@flagify/astro` builds on `@flagify/node`, so the underlying client is silent in normal operation. To diagnose realtime/SSE issues during development, opt in with the `FLAGIFY_DEBUG` env var:
+
+```bash
+FLAGIFY_DEBUG=1 astro dev
+```
+
+When enabled, the client emits verbose `console.info` / `console.debug` lines for SSE connect, reconnect, initial sync, flag changes, and idle-timeout warnings (server heartbeat every 15s; client watchdog defaults to 45s of silence before forcing a reconnect). Real errors (failed evaluation, missing client init in middleware) always surface regardless. SSG builds run a fresh client per build and never open a long-lived stream — `FLAGIFY_DEBUG` mostly matters for `astro dev` and SSR deployments.
+
 ## Contributing
 
 We welcome contributions. Please open an issue first to discuss what you'd like to change.

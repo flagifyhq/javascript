@@ -345,6 +345,16 @@ Import the testing module from the `@flagify/nestjs/testing` entrypoint or direc
 | `FLAGIFY_OPTIONS` | Symbol | Injection token for module options |
 | `REQUIRE_FLAG_KEY` | String | Metadata key used by `@RequireFlag` |
 
+## Debug logging (`FLAGIFY_DEBUG`)
+
+`@flagify/nestjs` wraps `@flagify/node`, so the underlying client is silent in normal operation. To diagnose realtime/SSE issues, opt in with the `FLAGIFY_DEBUG` env var:
+
+```bash
+FLAGIFY_DEBUG=1 nest start
+```
+
+When enabled, the client emits verbose `console.info` / `console.debug` lines for SSE connect, reconnect, initial sync, flag changes, and idle-timeout warnings (server heartbeat is every 15s; client watchdog defaults to 45s of silence before forcing a reconnect). Real errors (failed evaluation, duplicate `connect()`, missing module init) always surface regardless of the flag.
+
 ## Contributing
 
 We welcome contributions. Please open an issue first to discuss what you'd like to change.
