@@ -2,6 +2,26 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
+## [v1.4.0](https://github.com/flagifyhq/javascript/releases/tag/v1.4.0) — 2026-05-02
+
+### Features
+
+- **`@flagify/node`** — verbose SSE logs (connect / reconnect / sync / flag-change notifications / idle-timeout warnings) are now gated behind an opt-in `FLAGIFY_DEBUG` env var ([#39](https://github.com/flagifyhq/javascript/pull/39)). Production consoles stay quiet by default — the previous always-on `console.info`/`debug`/`warn` lines emitted on every SSE connect, reconnect, initial sync, flag change, and idle timeout were noisy in every consumer app. Activates with `FLAGIFY_DEBUG=1` (Node + bundlers that inline `process.env`) or `localStorage.FLAGIFY_DEBUG = "1"` for browser-only builds without env-var inlining (Next.js without `NEXT_PUBLIC_` prefix, Vite without `VITE_*` prefix, etc.). Real errors that indicate a real problem (failed post-sync evaluation, duplicate `connect()` call, missing `<FlagifyProvider>`) are **not** gated and continue to log so devs are not surprised by silent failures. Decision: `Flagify Docs/decisions/2026-04-30-flagify-debug-env-var.md`.
+- **`@flagify/react`** — same opt-in applies via the underlying `@flagify/node` client. Browser bundles read `localStorage.FLAGIFY_DEBUG`; documentation calls out the `NEXT_PUBLIC_` / `VITE_*` inlining caveat so users do not assume `process.env.FLAGIFY_DEBUG` reaches the browser.
+- **`@flagify/nestjs`**, **`@flagify/astro`** — wrappers around `@flagify/node`; the same `FLAGIFY_DEBUG=1` env var enables verbose logs in NestJS apps (`FLAGIFY_DEBUG=1 nest start`) and Astro projects (`FLAGIFY_DEBUG=1 astro dev`). Off by default.
+
+### Behavior Change (read carefully before upgrading)
+
+- **The verbose SSE logs that used to appear by default no longer appear by default.** If your tooling (log aggregation, alerting, debugging scripts) parses for strings like `[Flagify] Realtime connected`, `[Flagify] Synced N flags via SSE`, or `[Flagify] Flag changed: <key>`, those lines now require `FLAGIFY_DEBUG=1`. Errors continue to log unconditionally. No API changes — `isEnabled`, `getValue`, `getVariant`, `evaluate`, `ready`, `destroy`, and the React hooks all keep identical signatures. The `debug.ts` helper itself is internal (excluded from the public barrel) so renaming or removing `debugLog` / `debugEnabled` will not break consumers.
+
+### Documentation
+
+- **`@flagify/node` README** — new "Debug logging (`FLAGIFY_DEBUG`)" section + entry in the configuration env-var table.
+- **`@flagify/react` README** — new "Debugging the realtime connection" section that documents both the `FLAGIFY_DEBUG=1` env-var path (works under bundlers that inline `process.env`) and the `localStorage.FLAGIFY_DEBUG = "1"` path (browser fallback).
+- **`@flagify/nestjs` README** and **`@flagify/astro` README** — short notes pointing to the same env var since both wrap `@flagify/node`.
+- **Website** SDK docs at `apps/website/src/content/docs/v1/sdk/javascript.mdx` and `react.mdx` document the env var and the bundler-prefix caveat ([flagifyhq/apps#166](https://github.com/flagifyhq/apps/pull/166)). `nestjs.mdx` includes the same note; `astro.mdx` is updated in this release.
+- **Heartbeat interval** clarified: the server emits an SSE heartbeat every **15s**; the client `sseIdleTimeoutMs` watchdog defaults to **45s** (3 missed heartbeats) before forcing a reconnect. Both numbers now appear consistently across `@flagify/node` README, `javascript.mdx`, and `react.mdx`.
+
 ## [v1.3.0](https://github.com/flagifyhq/javascript/releases/tag/v1.3.0) — 2026-04-14
 
 ### Bug Fixes
