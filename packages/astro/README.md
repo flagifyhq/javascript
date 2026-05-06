@@ -275,6 +275,31 @@ declare namespace App {
 |--------|------|-------------|
 | `createFlagifyAdapter` | Function | Creates a Vercel Flags SDK compatible adapter |
 
+## Verifying webhook signatures
+
+`@flagify/astro` re-exports the verification helpers from `@flagify/node` (`verifyWebhookSignature`, `constructWebhookEvent`, `WebhookSignatureError`, plus the `WebhookEvent` types) **and** ships `defineWebhookHandler` — a factory that returns an Astro `APIRoute` for your webhook endpoint.
+
+```ts
+// src/pages/api/flagify-webhook.ts
+import { defineWebhookHandler } from "@flagify/astro";
+
+export const POST = defineWebhookHandler({
+  secret: import.meta.env.FLAGIFY_WEBHOOK_SECRET,
+  onEvent: async (event) => {
+    // Idempotency: persist event.id and skip duplicates on retry.
+    console.log(event.event, event.data.environmentId);
+  },
+});
+```
+
+The handler returns:
+
+- `200` once `onEvent` resolves.
+- `403` when the signature does not validate (with the failure code in the body).
+- `500` if `onEvent` throws.
+
+Astro must be running in **SSR mode** (or a hybrid route) — static pages cannot serve webhooks. See `verifyWebhookSignature` / `constructWebhookEvent` in `@flagify/node` for the lower-level API and the optional `tolerance` / `now` options.
+
 ## Debug logging (`FLAGIFY_DEBUG`)
 
 `@flagify/astro` builds on `@flagify/node`, so the underlying client is silent in normal operation. To diagnose realtime/SSE issues during development, opt in with the `FLAGIFY_DEBUG` env var:

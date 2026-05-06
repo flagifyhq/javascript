@@ -7,3 +7,20 @@ export type {
   FlagifyLocals,
 } from "./types";
 export { initClient, getClient, waitForClient, destroyClient } from "./client";
+export {
+  WebhookSignatureError,
+  constructWebhookEvent,
+  defineWebhookHandler,
+  verifyWebhookSignature,
+} from "./webhooks";
+export type {
+  DefineWebhookHandlerOptions,
+  VerifyWebhookSignatureOptions,
+  WebhookEvent,
+  WebhookEventActor,
+  WebhookEventData,
+  WebhookEventMetadata,
+  WebhookEventResource,
+  WebhookEventType,
+  WebhookSignatureErrorCode,
+} from "./webhooks";

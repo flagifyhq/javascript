@@ -345,6 +345,47 @@ Import the testing module from the `@flagify/nestjs/testing` entrypoint or direc
 | `FLAGIFY_OPTIONS` | Symbol | Injection token for module options |
 | `REQUIRE_FLAG_KEY` | String | Metadata key used by `@RequireFlag` |
 
+## Verifying webhook signatures
+
+`@flagify/nestjs` re-exports the verification helpers from `@flagify/node` (`verifyWebhookSignature`, `constructWebhookEvent`, `WebhookSignatureError`, plus the `WebhookEvent` types) **and** ships a NestJS guard that does the verification for you.
+
+`FlagifyWebhookGuard` reads the raw request body, validates the `X-Flagify-Signature` header, and stores the parsed event on `request.flagifyEvent`. On failure it throws `ForbiddenException` with the failure code in the message.
+
+```ts
+import { Body, Controller, Post, Req, UseGuards } from "@nestjs/common";
+import { FlagifyWebhookGuard, type WebhookEvent } from "@flagify/nestjs";
+
+@Controller("webhooks/flagify")
+export class FlagifyWebhookController {
+  @Post()
+  @UseGuards(
+    new FlagifyWebhookGuard({ secret: process.env.FLAGIFY_WEBHOOK_SECRET! }),
+  )
+  handle(@Req() req: { flagifyEvent: WebhookEvent }) {
+    // Idempotency: persist req.flagifyEvent.id and skip duplicates on retry.
+    console.log(req.flagifyEvent.event);
+    return { ok: true };
+  }
+}
+```
+
+**Raw body required.** Webhook signatures sign the original bytes, not the JSON-parsed object. Wire NestJS to expose the raw buffer:
+
+```ts
+// main.ts
+import { json } from "express";
+
+app.use(
+  json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+```
+
+Multi-webhook setups can pass `resolveSecret: (req) => secretFor(req)` instead of a static `secret`. See `verifyWebhookSignature` / `constructWebhookEvent` in `@flagify/node` for the lower-level API.
+
 ## Debug logging (`FLAGIFY_DEBUG`)
 
 `@flagify/nestjs` wraps `@flagify/node`, so the underlying client is silent in normal operation. To diagnose realtime/SSE issues, opt in with the `FLAGIFY_DEBUG` env var:

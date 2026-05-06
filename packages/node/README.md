@@ -369,6 +369,54 @@ You'll see entries like:
 
 Real errors (failed post-sync evaluation, duplicate `connect()` calls, missing configuration) always log with no opt-in needed.
 
+## Verifying webhook signatures
+
+Every Flagify webhook delivery includes an `X-Flagify-Signature: t=<unix>,v1=<hex>` header. The signed string is `<unix>.<rawBody>` with HMAC-SHA256 keyed on the webhook secret you received when the subscription was created.
+
+Two helpers ship in `@flagify/node` for receivers:
+
+- `verifyWebhookSignature(rawBody, header, secret, opts?)` — throws on failure, returns `void` on success. Use when you parse the body yourself.
+- `constructWebhookEvent(rawBody, header, secret, opts?)` — verifies AND parses the JSON, returns a typed `WebhookEvent`. The convenient default.
+
+```typescript
+import express from "express";
+import { constructWebhookEvent, WebhookSignatureError } from "@flagify/node";
+
+const app = express();
+
+// Webhook signatures sign the *raw bytes*, so disable JSON parsing for this route.
+app.post(
+  "/webhooks/flagify",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    try {
+      const event = constructWebhookEvent(
+        req.body, // Buffer — the raw bytes
+        req.header("x-flagify-signature") ?? "",
+        process.env.FLAGIFY_WEBHOOK_SECRET!,
+      );
+      // Idempotency: persist event.id and skip duplicates on retry.
+      console.log(event.event, event.data.environmentId);
+      res.sendStatus(200);
+    } catch (err) {
+      if (err instanceof WebhookSignatureError) {
+        console.error("rejected webhook:", err.code);
+        res.sendStatus(403);
+        return;
+      }
+      throw err;
+    }
+  },
+);
+```
+
+Both helpers accept an optional `{ tolerance, now }`:
+
+- `tolerance` (seconds, default `300`) — replay-attack window. Set to `0` to disable timestamp checking.
+- `now` — override the clock; useful in tests.
+
+`WebhookSignatureError.code` enumerates the failure modes: `MISSING_HEADER`, `MALFORMED_HEADER`, `TIMESTAMP_OUT_OF_TOLERANCE`, `SIGNATURE_MISMATCH`, `INVALID_PAYLOAD`.
+
 ## Types
 
 All types are exported for convenience:
@@ -383,6 +431,12 @@ import type {
   FlagChangeEvent,
   RealtimeEvents,
   RealtimeListener,
+  // webhook signature helpers
+  WebhookEvent,
+  WebhookEventType,
+  WebhookEventData,
+  VerifyWebhookSignatureOptions,
+  WebhookSignatureErrorCode,
 } from '@flagify/node'
 ```
 
