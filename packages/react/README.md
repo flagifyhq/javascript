@@ -74,7 +74,7 @@ yarn add @flagify/react
 
 ## React Native / Expo
 
-`@flagify/react` is fully compatible with React Native (0.64+) and Expo (SDK 44+). No separate package or polyfills needed.
+`@flagify/react` is fully compatible with React Native (0.64+) and Expo (SDK 44+). No separate package or polyfills needed -- the underlying [`@flagify/node`](https://github.com/flagifyhq/javascript/tree/main/packages/node#supported-runtimes) HTTP client handles the Hermes runtime gap transparently (see "Supported runtimes" in the `@flagify/node` README).
 
 ```bash
 npx expo install @flagify/react

@@ -33,11 +33,13 @@
 - **Stale-while-revalidate** -- Serves cached values while refreshing in the background
 - **Lightweight** -- Zero runtime dependencies (except `dotenv`)
 - **Isomorphic** -- ESM and CommonJS output
+- **Runtime-friendly** -- Runs on Node.js, modern browsers, edge runtimes, and **React Native (Hermes engine)**
 
 ## Table of contents
 
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Supported runtimes](#supported-runtimes)
 - [Configuration](#configuration)
 - [User context & targeting](#user-context--targeting)
 - [API reference](#api-reference)
@@ -77,6 +79,17 @@ if (flagify.isEnabled('new-checkout')) {
 // Typed value
 const limit = flagify.getValue<number>('rate-limit')
 ```
+
+## Supported runtimes
+
+`@flagify/node` works wherever the standard `fetch` API and `AbortController` are available:
+
+- **Node.js** -- any version with `fetch` (Node 18+ natively; Node 16 with a fetch polyfill). No minimum `engines.node` is enforced.
+- **Modern browsers** -- evergreen Chromium, Firefox, Safari.
+- **Edge runtimes** -- Cloudflare Workers, Vercel Edge, Deno, Bun.
+- **React Native (Hermes engine)** -- iOS and Android. The SDK polyfills `AbortSignal.timeout` internally so runtimes that ship `AbortController` without the static `timeout` helper (Hermes, Node < 17.3) still get the 10s request deadline.
+
+This is why `@flagify/react` works on React Native without any extra setup -- it delegates to `@flagify/node`, which handles the runtime gap transparently.
 
 ## Configuration
 
