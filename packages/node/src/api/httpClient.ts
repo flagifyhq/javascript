@@ -19,6 +19,38 @@ export interface FlagifyHttpClient {
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
+interface TimeoutSignal {
+  signal: AbortSignal;
+  cancel: () => void;
+}
+
+function createTimeoutSignal(ms: number): TimeoutSignal {
+  const hasNativeTimeout =
+    typeof AbortSignal !== "undefined" &&
+    typeof (AbortSignal as { timeout?: (ms: number) => AbortSignal }).timeout === "function";
+
+  if (hasNativeTimeout) {
+    return {
+      signal: (AbortSignal as { timeout: (ms: number) => AbortSignal }).timeout(ms),
+      cancel: () => {},
+    };
+  }
+
+  const controller = new AbortController();
+  const reason =
+    typeof DOMException !== "undefined"
+      ? new DOMException("The operation timed out.", "TimeoutError")
+      : Object.assign(new Error("The operation timed out."), { name: "TimeoutError" });
+  const timer = setTimeout(() => {
+    controller.abort(reason);
+  }, ms);
+
+  return {
+    signal: controller.signal,
+    cancel: () => clearTimeout(timer),
+  };
+}
+
 function throwForStatus(method: string, path: string, status: number, statusText: string): never {
   if (status === 401) {
     throw new FlagifyAuthError(
@@ -66,11 +98,17 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
     headers: frozenHeaders,
 
     get: async <T = unknown>(path: string): Promise<T> => {
-      const res = await fetch(`${baseUrl}${path}`, {
-        method: "GET",
-        headers,
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-      });
+      const { signal, cancel } = createTimeoutSignal(DEFAULT_TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(`${baseUrl}${path}`, {
+          method: "GET",
+          headers,
+          signal,
+        });
+      } finally {
+        cancel();
+      }
 
       if (!res.ok) {
         throwForStatus("GET", path, res.status, res.statusText);
@@ -87,12 +125,18 @@ export function createHttpClient(config: FlagifyOptions): FlagifyHttpClient {
       path: string,
       body: B,
     ): Promise<T> => {
-      const res = await fetch(`${baseUrl}${path}`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-      });
+      const { signal, cancel } = createTimeoutSignal(DEFAULT_TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(`${baseUrl}${path}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+          signal,
+        });
+      } finally {
+        cancel();
+      }
 
       if (!res.ok) {
         throwForStatus("POST", path, res.status, res.statusText);
