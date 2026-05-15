@@ -2,7 +2,11 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
-## [v1.5.0](https://github.com/flagifyhq/javascript/releases/tag/v1.5.0) — 2026-05-02
+## [v1.5.0](https://github.com/flagifyhq/javascript/releases/tag/v1.5.0) — 2026-05-15
+
+### Bug Fixes
+
+- **`@flagify/node`** — polyfill `AbortSignal.timeout` for runtimes that ship `AbortController` without the static `timeout` helper ([#42](https://github.com/flagifyhq/javascript/pull/42)). React Native (Hermes engine, iOS + Android) and Node.js `<17.3` were throwing `TypeError: AbortSignal.timeout is not a function` the first time the HTTP client tried to enforce a request deadline, breaking `flagify.ready()` and any subsequent fetch. The fix wraps the lookup in a feature detect and falls back to a `new AbortController()` + `setTimeout(controller.abort, ms)` shim — same observable behavior (10s request timeout aborts with `AbortError`), zero new dependencies, no `engines.node` floor introduced. `@flagify/react` is unaffected directly but inherits the fix via `@flagify/node` and now works out of the box in React Native / Expo without the user installing a polyfill. Decision: `Flagify Docs/decisions/2026-05-14-abortsignal-timeout-runtime-compat.md`.
 
 ### Features
 
