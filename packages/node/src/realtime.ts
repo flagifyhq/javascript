@@ -28,6 +28,9 @@ const DEFAULT_IDLE_TIMEOUT_MS = 45_000;
 const DEFAULT_RECONNECT_BASE_MS = 1_000;
 const DEFAULT_RECONNECT_MAX_MS = 30_000;
 const WATCHDOG_CHECK_INTERVAL_MS = 10_000;
+// A connection must survive this long before we reset the backoff counter.
+// Prevents tight reconnection loops when the server drops right after initial_sync.
+const HEALTHY_CONNECTION_GRACE_MS = 5_000;
 
 /** Status codes that will never succeed on retry with the same credentials. */
 const NON_RETRYABLE_CODES = new Set([401, 403]);
@@ -135,6 +138,7 @@ export class RealtimeListener {
   }
 
   private async stream(signal: AbortSignal): Promise<void> {
+    let connectedAt = 0;
     try {
       this.isStreaming = true;
       const res = await fetch(
@@ -163,16 +167,11 @@ export class RealtimeListener {
         throw new Error("SSE response has no body");
       }
 
-      // Successful connection → reset backoff and drop any stale
-      // server-suggested retry floor. Pragmatic choice: we re-learn
-      // the server's backpressure each stream. Servers that want to
-      // enforce a longer delay should re-send `retry:` on the new
-      // stream — this deviates from the strict WHATWG SSE semantics
-      // (where `retry:` persists until updated) in exchange for not
-      // having a one-shot `retry: 60000` pin the backoff forever.
-      this.reconnectAttempts = 0;
+      // Drop the server-suggested retry floor so we re-learn from
+      // the new stream. Don't reset reconnectAttempts yet — see below.
+      connectedAt = Date.now();
       this.serverRetryMs = null;
-      this.lastActivityAt = Date.now();
+      this.lastActivityAt = connectedAt;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -198,6 +197,7 @@ export class RealtimeListener {
 
       // Stream ended normally — reconnect unless we've been torn down.
       if (!signal.aborted && !this.destroyed) {
+        this.resetBackoffIfHealthy(connectedAt);
         this.scheduleReconnect();
       }
     } catch (err) {
@@ -213,6 +213,7 @@ export class RealtimeListener {
         return;
       }
 
+      this.resetBackoffIfHealthy(connectedAt);
       this.scheduleReconnect();
     } finally {
       this.isStreaming = false;
@@ -270,6 +271,13 @@ export class RealtimeListener {
       } catch {
         console.warn("[Flagify] Failed to parse SSE event:", data);
       }
+    }
+  }
+
+  private resetBackoffIfHealthy(connectedAt: number): void {
+    if (connectedAt > 0 && Date.now() - connectedAt >= HEALTHY_CONNECTION_GRACE_MS) {
+      this.reconnectAttempts = 0;
+      this.serverRetryMs = null;
     }
   }
 
