@@ -7,6 +7,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@flagify/node/webhooks': path.resolve(__dirname, '../node/src/webhooks.ts'),
       '@flagify/node': path.resolve(__dirname, '../node/src/index.ts'),
     },
   },

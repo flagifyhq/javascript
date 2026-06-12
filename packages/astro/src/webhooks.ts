@@ -4,13 +4,13 @@ import {
   type VerifyWebhookSignatureOptions,
   type WebhookEvent,
   type WebhookEventType,
-} from "@flagify/node";
+} from "@flagify/node/webhooks";
 
 export {
   WebhookSignatureError,
   constructWebhookEvent,
   verifyWebhookSignature,
-} from "@flagify/node";
+} from "@flagify/node/webhooks";
 export type {
   VerifyWebhookSignatureOptions,
   WebhookEvent,
@@ -20,7 +20,7 @@ export type {
   WebhookEventResource,
   WebhookEventType,
   WebhookSignatureErrorCode,
-} from "@flagify/node";
+} from "@flagify/node/webhooks";
 
 export interface DefineWebhookHandlerOptions<
   T extends WebhookEventType = WebhookEventType,

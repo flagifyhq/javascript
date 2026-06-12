@@ -1,7 +1,7 @@
 /**
- * Re-exports the webhook signature helpers from `@flagify/node` so
- * NestJS consumers can `import { ... } from "@flagify/nestjs"` without a
- * second package import.
+ * Re-exports the webhook signature helpers from `@flagify/node/webhooks`
+ * so NestJS consumers can `import { ... } from "@flagify/nestjs"` without
+ * a second package import.
  */
 export {
   WebhookSignatureError,
@@ -15,7 +15,7 @@ export {
   type WebhookEventResource,
   type WebhookEventType,
   type WebhookSignatureErrorCode,
-} from "@flagify/node";
+} from "@flagify/node/webhooks";
 
 export { FlagifyWebhookGuard } from "./webhook-signature.guard";
 export type { WebhookSignatureGuardOptions } from "./webhook-signature.guard";

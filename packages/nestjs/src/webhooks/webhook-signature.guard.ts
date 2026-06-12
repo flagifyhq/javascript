@@ -10,7 +10,7 @@ import {
   constructWebhookEvent,
   type VerifyWebhookSignatureOptions,
   type WebhookEvent,
-} from "@flagify/node";
+} from "@flagify/node/webhooks";
 
 export interface WebhookSignatureGuardOptions {
   /**
