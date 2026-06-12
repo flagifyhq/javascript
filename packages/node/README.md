@@ -386,14 +386,19 @@ Real errors (failed post-sync evaluation, duplicate `connect()` calls, missing c
 
 Every Flagify webhook delivery includes an `X-Flagify-Signature: t=<unix>,v1=<hex>` header. The signed string is `<unix>.<rawBody>` with HMAC-SHA256 keyed on the webhook secret you received when the subscription was created.
 
-Two helpers ship in `@flagify/node` for receivers:
+Two helpers ship in the server-only `@flagify/node/webhooks` subpath:
 
 - `verifyWebhookSignature(rawBody, header, secret, opts?)` — throws on failure, returns `void` on success. Use when you parse the body yourself.
 - `constructWebhookEvent(rawBody, header, secret, opts?)` — verifies AND parses the JSON, returns a typed `WebhookEvent`. The convenient default.
 
+> **Why a subpath?** These helpers use `node:crypto`, which does not exist in React Native. Keeping them out of the main entry keeps `@flagify/node` (and therefore `@flagify/react`) bundleable by Metro/Expo. Since v1.6.0 they are **not** exported from the package root — import them from `@flagify/node/webhooks`.
+
 ```typescript
 import express from "express";
-import { constructWebhookEvent, WebhookSignatureError } from "@flagify/node";
+import {
+  constructWebhookEvent,
+  WebhookSignatureError,
+} from "@flagify/node/webhooks";
 
 const app = express();
 
@@ -444,13 +449,16 @@ import type {
   FlagChangeEvent,
   RealtimeEvents,
   RealtimeListener,
-  // webhook signature helpers
+} from '@flagify/node'
+
+// Webhook types live behind the server-only subpath:
+import type {
   WebhookEvent,
   WebhookEventType,
   WebhookEventData,
   VerifyWebhookSignatureOptions,
   WebhookSignatureErrorCode,
-} from '@flagify/node'
+} from '@flagify/node/webhooks'
 ```
 
 ## Contributing

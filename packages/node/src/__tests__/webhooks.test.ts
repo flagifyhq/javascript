@@ -1,9 +1,14 @@
-import { createHmac } from "crypto";
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { constructWebhookEvent } from "../webhooks/construct";
-import { WebhookSignatureError } from "../webhooks/errors";
-import { verifyWebhookSignature } from "../webhooks/verify";
+// Import through the `@flagify/node/webhooks` entry (src/webhooks.ts) so the
+// suite exercises the exact surface consumers get from the subpath export.
+import {
+  constructWebhookEvent,
+  WebhookSignatureError,
+  verifyWebhookSignature,
+} from "../webhooks";
+import * as rootEntry from "../index";
 
 const SECRET = "topsecret";
 
@@ -191,5 +196,16 @@ describe("constructWebhookEvent", () => {
     expect(() =>
       constructWebhookEvent("not-json", "malformed", SECRET),
     ).toThrowError(expect.objectContaining({ code: "MALFORMED_HEADER" }));
+  });
+});
+
+describe("root entry isolation", () => {
+  // The main entry must stay platform-neutral: webhook helpers (which pull
+  // in node:crypto) live exclusively behind `@flagify/node/webhooks`.
+  it("does not export webhook helpers from the package root", () => {
+    const rootExports = rootEntry as Record<string, unknown>;
+    expect(rootExports.verifyWebhookSignature).toBeUndefined();
+    expect(rootExports.constructWebhookEvent).toBeUndefined();
+    expect(rootExports.WebhookSignatureError).toBeUndefined();
   });
 });

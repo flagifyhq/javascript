@@ -2,6 +2,28 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
+## [v1.6.0](https://github.com/flagifyhq/javascript/releases/tag/v1.6.0) — unreleased
+
+### Bug Fixes
+
+- **`@flagify/node`** — the main entry no longer imports Node's `crypto` module, fixing the build-time failure every React Native / Expo app hit on v1.5.0 (`The package at "@flagify/node/dist/index.mjs" attempted to import the Node standard library module "crypto"`). The webhook signature helpers introduced in v1.5.0 were re-exported from the package root, and Metro — which does not tree-shake — dragged the top-level `crypto` import into every `@flagify/react` bundle. The helpers now live behind a dedicated server-only subpath export (see Breaking Change below), the main entry is verified platform-neutral, and a CI bundling guard (neutral-platform esbuild over a `@flagify/react` consumer fixture) fails the build if any Node builtin ever re-enters the main-entry graph.
+
+### BREAKING — webhook helpers moved to `@flagify/node/webhooks`
+
+- `verifyWebhookSignature`, `constructWebhookEvent`, `WebhookSignatureError`, and the `Webhook*` types are **no longer exported from the `@flagify/node` package root**. Import them from the server-only subpath instead:
+
+  ```diff
+  - import { constructWebhookEvent, WebhookSignatureError } from "@flagify/node";
+  + import { constructWebhookEvent, WebhookSignatureError } from "@flagify/node/webhooks";
+  ```
+
+  Only code written against v1.5.0's root exports is affected (the helpers did not exist before v1.5.0). `@flagify/nestjs` and `@flagify/astro` re-export the helpers from their own surfaces exactly as before — their consumers need no changes.
+
+### Notes
+
+- **v1.5.0 is broken on React Native/Expo** — any app bundling `@flagify/react@1.5.0` fails at build time. Upgrade straight to v1.6.0; both `@flagify/node@1.5.0` and `@flagify/react@1.5.0` are deprecated on npm.
+- Decision log: `Flagify Docs/decisions/2026-06-12-node-webhooks-subpath-export.md`.
+
 ## [v1.5.0](https://github.com/flagifyhq/javascript/releases/tag/v1.5.0) — 2026-05-26
 
 ### Bug Fixes
