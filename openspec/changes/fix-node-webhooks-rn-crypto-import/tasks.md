@@ -24,12 +24,12 @@
 
 ## 4. Release and registry
 
-- [ ] 4.1 Open PR in `flagifyhq/javascript` (branch, never push main); merge after review
+- [x] 4.1 Open PR in `flagifyhq/javascript` (branch, never push main); merge after review — PR: https://github.com/flagifyhq/javascript/pull/44 (docs companion: https://github.com/flagifyhq/apps/pull/174). Merge is manual, pending review
 - [ ] 4.2 Cut release 1.6.0 for `@flagify/node` and `@flagify/react` via the `flagify-release` skill (tag push publishes)
 - [ ] 4.3 After publish: `npm deprecate @flagify/node@1.5.0` and `@flagify/react@1.5.0` with message pointing to 1.6.0 and the new subpath
 
 ## 5. Follow-ups (cross-repo)
 
-- [ ] 5.1 Decision log: write `Flagify Docs/decisions/2026-06-XX-node-webhooks-subpath-export.md` (with `## Decisiones clave` block) and update the index in `Flagify Docs/README.md`
+- [x] 5.1 Decision log: `Flagify Docs/decisions/2026-06-12-node-webhooks-subpath-export.md` written (with `## Decisiones clave` block); indexes updated in `Flagify Docs/README.md` and `decisions/README.md`; feedback file closed with resolution banner
 - [ ] 5.2 Propose recording the policy "server-only additions to @flagify/node go behind subpath exports from day 1" in repo guidance (pending maintainer confirmation)
 - [ ] 5.3 Notify downstream (vanguardhq) to remove the Metro crypto shim after upgrading to 1.6.0
