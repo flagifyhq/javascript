@@ -2,11 +2,11 @@
 
 All notable changes to the Flagify JavaScript SDKs will be documented in this file.
 
-## [v1.6.0](https://github.com/flagifyhq/javascript/releases/tag/v1.6.0) — unreleased
+## [v1.6.0](https://github.com/flagifyhq/javascript/releases/tag/v1.6.0) — 2026-06-12
 
 ### Bug Fixes
 
-- **`@flagify/node`** — the main entry no longer imports Node's `crypto` module, fixing the build-time failure every React Native / Expo app hit on v1.5.0 (`The package at "@flagify/node/dist/index.mjs" attempted to import the Node standard library module "crypto"`). The webhook signature helpers introduced in v1.5.0 were re-exported from the package root, and Metro — which does not tree-shake — dragged the top-level `crypto` import into every `@flagify/react` bundle. The helpers now live behind a dedicated server-only subpath export (see Breaking Change below), the main entry is verified platform-neutral, and a CI bundling guard (neutral-platform esbuild over a `@flagify/react` consumer fixture) fails the build if any Node builtin ever re-enters the main-entry graph.
+- **`@flagify/node`** — the main entry no longer imports Node's `crypto` module ([#44](https://github.com/flagifyhq/javascript/pull/44)), fixing the build-time failure every React Native / Expo app hit on v1.5.0 (`The package at "@flagify/node/dist/index.mjs" attempted to import the Node standard library module "crypto"`). The webhook signature helpers introduced in v1.5.0 were re-exported from the package root, and Metro — which does not tree-shake — dragged the top-level `crypto` import into every `@flagify/react` bundle. The helpers now live behind a dedicated server-only subpath export (see Breaking Change below), the main entry is verified platform-neutral, and a CI bundling guard (neutral-platform esbuild over a `@flagify/react` consumer fixture) fails the build if any Node builtin ever re-enters the main-entry graph.
 
 ### BREAKING — webhook helpers moved to `@flagify/node/webhooks`
 
