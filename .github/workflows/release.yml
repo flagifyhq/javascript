@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -35,6 +35,9 @@ jobs:
 
   publish:
     needs: build-and-test
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +46,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
 
@@ -53,13 +56,30 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11
+
       - name: Set version from tag
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           echo "Publishing version $VERSION"
           pnpm -r exec -- npm version "$VERSION" --no-git-tag-version --allow-same-version
 
+      # pnpm pack resolves workspace:* dependencies before npm publishes via OIDC.
+      - name: Pack packages
+        run: |
+          mkdir -p "$RUNNER_TEMP/flagify-packages"
+          for package in node react nestjs astro; do
+            (cd "packages/$package" && pnpm pack --pack-destination "$RUNNER_TEMP/flagify-packages")
+          done
+
       - name: Publish to npm
-        run: pnpm -r publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for package in node react nestjs astro; do
+            # Keep retries of a partially published release safe.
+            if npm view "@flagify/$package@${GITHUB_REF_NAME#v}" version >/dev/null 2>&1; then
+              echo "@flagify/$package@${GITHUB_REF_NAME#v} is already published"
+              continue
+            fi
+            npm publish "$RUNNER_TEMP/flagify-packages/flagify-${package}-${GITHUB_REF_NAME#v}.tgz" --access public
+          done
